@@ -1,11 +1,10 @@
 #include "window.h"
 
-#include <iostream>
-
 #include "debug.h"
 
 
-void FrameBufferSizeCallback(GLFWwindow* window, int width, int height)
+
+void FrameBufferSizeCallback(GLFWwindow* id, int width, int height)
 {
     // For retina displays width and height will end up significantly higher than the original input values.
     // Change the OpenGL render area.
@@ -13,9 +12,10 @@ void FrameBufferSizeCallback(GLFWwindow* window, int width, int height)
 }
 
 
-Window CreateWindow(int width, int height)
+
+Window CreateWindow(int width, int height, entt::registry* registry, GLFWkeyfun key_callback)
 {
-    Window window;
+    Window window { nullptr, registry };
 
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -33,16 +33,14 @@ Window CreateWindow(int width, int height)
 
     // 'width' and 'height' will be set in 'FrameBufferSizeCallback' as some displays (like Retina displays) use more
     // 4 pixels for every pixel.
-    glfwSetWindowUserPointer(window.id, &window);
-
     glfwMakeContextCurrent(window.id);
 
     Assert(gladLoadGLLoader((GLADloadproc) glfwGetProcAddress), "Failed to initialize GLAD");
 
     glfwSetFramebufferSizeCallback(window.id, FrameBufferSizeCallback);
-//    glfwSetKeyCallback(this->id, KeyCallback);
-//    glfwSetCursorPosCallback(this->id, MouseCallback);
-//    glfwSetScrollCallback(this->id, ScrollCallback);
+    glfwSetKeyCallback(window.id, key_callback);
+//    glfwSetCursorPosCallback(window.id, MouseCallback);
+//    glfwSetScrollCallback(window.id, ScrollCallback);
 
     glfwSetInputMode(window.id, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -51,7 +49,6 @@ Window CreateWindow(int width, int height)
     int resolution_width, resolution_height;
     glfwGetFramebufferSize(window.id, &resolution_width, &resolution_height);
     FrameBufferSizeCallback(window.id, resolution_width, resolution_height);
-
 
     Info("Successfully created 'GLFWwindow'");
 

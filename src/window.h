@@ -1,8 +1,9 @@
 #include <tuple>
+#include <vector>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-
+#include <entt/entt.hpp>
 
 
 // ---- CALLBACKS ----
@@ -15,8 +16,9 @@ void ScrollCallback(GLFWwindow* window, double x_offset, double y_offset);
 struct Window
 {
     GLFWwindow* id = nullptr;  // Should never be released.
+    entt::registry* registry;
 };
-Window CreateWindow(int width, int height);
+Window CreateWindow(int width, int height, entt::registry* registry, GLFWkeyfun key_callback);
 
 extern double PRESS_TIME_OUT_IN_SECONDS;
 
