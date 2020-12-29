@@ -1,4 +1,5 @@
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <entt/entt.hpp>
 
 #include "window.h"
@@ -159,9 +160,9 @@ struct Position { float x, y, z; };
 struct Rotation { float x, y, z; };
 struct Transform
 {
-    Position position;
-    Rotation velocity;
-    float  scale;
+    vec3  position;
+    vec3  rotation;
+    float scale;
 };
 
 struct Mesh
@@ -220,11 +221,13 @@ int main()
     auto mesh   = CreateMesh(Cube::VERTICES, Cube::UV_COORDS, Cube::NORMALS, 36);
 
     entt::registry registry;
-    for(const auto color : { RED })
+    float i = -0.5f;
+    for(const auto color : { RED, GREEN, BLUE })
     {
         const auto entity = registry.create();
-        registry.emplace<Transform>(entity, Position{0,0,-3}, Rotation{0,0,0}, 0.2f);
+        registry.emplace<Transform>(entity, vec3{i,0,0}, vec3{0,0,0}, 0.3f);
         registry.emplace<Renderable>(entity, color, &mesh);
+        i += 0.5f;
     }
 
     while (!glfwWindowShouldClose(window.id))
@@ -236,6 +239,14 @@ int main()
         for(auto [entity, transform, renderable]: registry.view<const Transform, const Renderable>().each())
         {
             glBindVertexArray(renderable.mesh->id);
+            auto matrix = glm::mat4();
+            matrix = glm::translate(matrix, transform.position);
+            matrix = glm::rotate(matrix, glm::radians(transform.rotation.x), vec3(1.0f, 0.0f, 0.0f));
+            matrix = glm::rotate(matrix, glm::radians(transform.rotation.y), vec3(0.0f, 1.0f, 0.0f));
+            matrix = glm::rotate(matrix, glm::radians(transform.rotation.z), vec3(0.0f, 0.0f, 1.0f));
+            matrix = glm::scale(matrix, vec3(transform.scale, transform.scale, transform.scale));
+
+            SetUniform(shader, "model", matrix);
             SetUniform(shader, "object_color", renderable.color);
             glDrawArrays(GL_TRIANGLES, 0, renderable.mesh->count);
         }
