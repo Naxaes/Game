@@ -5,10 +5,10 @@ Voxel-based game.
 
 ---- DONE ---
 * Get a running window.
+* Add ECS.
 
 
 ---- TODO ----
-* Add ECS.
 * Showcase a 3D-cube.
 * Create a movable FPS-camera.
 
