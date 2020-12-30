@@ -2,9 +2,20 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <entt/entt.hpp>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 #include "window.h"
 #include "shader.h"
 #include "utils.h"
+
+
+struct Vertex_
+{
+    vec3 position;
+    vec2 uv_coord;
+    vec3 normal;
+};
 
 
 using glm::vec2;
@@ -242,6 +253,32 @@ mat4 ViewMatrix(const vec3 position, const vec3 forward)
     return view;
 }
 
+#include <limits>
+#include <cstddef>
+Mesh CreateMesh(const std::vector<Vertex_>& vertices)
+{
+    // Create vertex array buffer to store vertex buffers and element buffers.
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
+    // Create vertex buffer to put our data into video memory.
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex_), vertices.data(), GL_STATIC_DRAW);
+
+    // Tell OpenGL the data's format.
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_), (void *) offsetof(Vertex_, position));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex_), (void *) offsetof(Vertex_, uv_coord));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_), (void *) offsetof(Vertex_, normal));
+
+    return { vao, vertices.size() };
+}
+
 
 Mesh CreateMesh(const vec3* positions, const vec2* uv_coords, const vec3* normals, size_t vertex_count)
 {
@@ -276,6 +313,52 @@ Mesh CreateMesh(const vec3* positions, const vec2* uv_coords, const vec3* normal
 
     return { vao, vertex_count };
 }
+
+
+
+Mesh CreateMesh(const std::vector<float>& positions, const std::vector<float>& texture_coordinates, const std::vector<float>& normals, const std::vector<GLuint>& indices)
+{
+    // TODO(ted): Maybe use some of these tips https://www.khronos.org/opengl/wiki/Vertex_Specification_Best_Practices.
+
+    size_t position_size = positions.size();
+    size_t texture_size  = texture_coordinates.size();
+    size_t normal_size   = normals.size();
+    size_t total_size    = position_size + texture_size + normal_size;
+
+    // Create vertex array buffer to store vertex buffers and element buffers.
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+
+    // Create an element buffer to put our data into video memory.
+    GLuint ebo;
+    glGenBuffers(1, &ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
+
+    // Create vertex buffer to put our data into video memory.
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
+    // Allocate a buffer and then insert data.
+    glBufferData(GL_ARRAY_BUFFER, total_size, nullptr, GL_STATIC_DRAW);
+    glBufferSubData(GL_ARRAY_BUFFER, 0, position_size, positions.data());
+    glBufferSubData(GL_ARRAY_BUFFER, position_size, texture_size,  texture_coordinates.data());
+    glBufferSubData(GL_ARRAY_BUFFER, position_size + texture_size, normal_size, normals.data());
+
+    // Tell OpenGL the data's format.
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) nullptr);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *) position_size);
+    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) (position_size + texture_size));
+
+    return { vao, indices.size() };
+}
+
 
 
 struct Event
@@ -437,6 +520,49 @@ void Render(entt::registry& registry, const Shader& shader, entt::entity camera)
 }
 
 
+Mesh LoadAsset(const std::string& inputfile)
+{
+    tinyobj::ObjReaderConfig reader_config;
+    tinyobj::ObjReader reader;
+    Assert(reader.ParseFromFile(inputfile, reader_config), "");
+
+    auto& attrib = reader.GetAttrib();
+    auto& shapes = reader.GetShapes();
+    auto& materials = reader.GetMaterials();
+
+    std::vector<Vertex_> vertices;
+    for (size_t s = 0; s < shapes.size(); s++) {
+        // Loop over faces(polygon)
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+            int fv = shapes[s].mesh.num_face_vertices[f];
+
+            // Loop over vertices in the face.
+            for (size_t v = 0; v < fv; v++) {
+                // access to vertex
+                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+                tinyobj::real_t vx = attrib.vertices[3*idx.vertex_index+0];
+                tinyobj::real_t vy = attrib.vertices[3*idx.vertex_index+1];
+                tinyobj::real_t vz = attrib.vertices[3*idx.vertex_index+2];
+                tinyobj::real_t nx = attrib.normals[3*idx.normal_index+0];
+                tinyobj::real_t ny = attrib.normals[3*idx.normal_index+1];
+                tinyobj::real_t nz = attrib.normals[3*idx.normal_index+2];
+                tinyobj::real_t tx = attrib.texcoords[2*idx.texcoord_index+0];
+                tinyobj::real_t ty = attrib.texcoords[2*idx.texcoord_index+1];
+                vertices.push_back({
+                       {vx, vy, vz}, {tx, ty}, {nx, ny, nz}
+               });
+            }
+            index_offset += fv;
+
+            // per-face material
+            shapes[s].mesh.material_ids[f];
+        }
+    }
+
+    auto mesh = CreateMesh(vertices);
+    return mesh;
+}
 
 
 int main()
@@ -445,16 +571,22 @@ int main()
     Window window = CreateWindow(2880, 1710, &registry, KeyCallback);
     glfwSetWindowUserPointer(window.id, &window);
 
-    auto shader = CreateShader("Basic", LoadFileToString("../resources/shaders/basic.vs.glsl").get(), LoadFileToString("../resources/shaders/basic.fs.glsl").get());
-    auto mesh   = CreateMesh(Cube::VERTICES, Cube::UV_COORDS, Cube::NORMALS, 36);
+    auto wreath = LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/wreath.obj");
+    auto post   = LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/lightpost.obj");
+    auto tree   = LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/treeDecorated.obj");
+    auto meshes = std::array{ wreath, post, tree };
 
-    float i = -1.0f;
-    for(const auto color : { RED, GREEN, BLUE })
+    auto shader = CreateShader("Basic", LoadFileToString("../resources/shaders/basic.vs.glsl").get(), LoadFileToString("../resources/shaders/basic.fs.glsl").get());
+//    auto mesh   = CreateMesh(Cube::VERTICES, Cube::UV_COORDS, Cube::NORMALS, 36);
+
+    float x = -1.0f;
+    auto colors = std::array{ RED, GREEN, BLUE };
+    for (int i = 0; i < 3; ++i)
     {
         const auto entity = registry.create();
-        registry.emplace<Transform>(entity, vec3{i,0,0}, vec3{0,0,0}, 0.3f);
-        registry.emplace<Renderable>(entity, color, &mesh);
-        i += 1.0f;
+        registry.emplace<Transform>(entity, vec3{x,0,0}, vec3{0,0,0}, 0.3f);
+        registry.emplace<Renderable>(entity, colors[i], &meshes[i]);
+        x += 1.0f;
     }
 
     const auto camera = registry.create();

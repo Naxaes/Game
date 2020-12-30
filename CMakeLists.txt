@@ -21,6 +21,7 @@ target_include_directories(Game PRIVATE src/)
 target_include_directories(Game PRIVATE libraries/glad/include/)
 target_include_directories(Game PRIVATE libraries/glm/)
 target_include_directories(Game PRIVATE libraries/entt/src/)
+target_include_directories(Game PRIVATE libraries/tinyobjloader/)
 target_link_libraries(Game glad glfw)
 
 
