@@ -2,20 +2,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <entt/entt.hpp>
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 #include "window.h"
 #include "shader.h"
 #include "utils.h"
-
-
-struct Vertex_
-{
-    vec3 position;
-    vec2 uv_coord;
-    vec3 normal;
-};
+#include "loader.h"
+#include "model.h"
 
 
 using glm::vec2;
@@ -31,157 +22,28 @@ static constexpr vec3 WHITE   {1.0f, 1.0f, 1.0f};
 static constexpr vec3 BLACK   {0.0f, 0.0f, 0.0f};
 
 
-struct Cube
-{
-    static constexpr vec3 VERTICES[] = {
-        {-1.0f,  1.0f, -1.0f},
-        {-1.0f, -1.0f, -1.0f},
-        { 1.0f, -1.0f, -1.0f},
-        { 1.0f, -1.0f, -1.0f},
-        { 1.0f,  1.0f, -1.0f},
-        {-1.0f,  1.0f, -1.0f},
-
-        {-1.0f, -1.0f,  1.0f},
-        {-1.0f, -1.0f, -1.0f},
-        {-1.0f,  1.0f, -1.0f},
-        {-1.0f,  1.0f, -1.0f},
-        {-1.0f,  1.0f,  1.0f},
-        {-1.0f, -1.0f,  1.0f},
-
-        { 1.0f, -1.0f, -1.0f},
-        { 1.0f, -1.0f,  1.0f},
-        { 1.0f,  1.0f,  1.0f},
-        { 1.0f,  1.0f,  1.0f},
-        { 1.0f,  1.0f, -1.0f},
-        { 1.0f, -1.0f, -1.0f},
-
-        {-1.0f, -1.0f,  1.0f},
-        {-1.0f,  1.0f,  1.0f},
-        { 1.0f,  1.0f,  1.0f},
-        { 1.0f,  1.0f,  1.0f},
-        { 1.0f, -1.0f,  1.0f},
-        {-1.0f, -1.0f,  1.0f},
-
-        {-1.0f,  1.0f, -1.0f},
-        { 1.0f,  1.0f, -1.0f},
-        { 1.0f,  1.0f,  1.0f},
-        { 1.0f,  1.0f,  1.0f},
-        {-1.0f,  1.0f,  1.0f},
-        {-1.0f,  1.0f, -1.0f},
-
-        {-1.0f, -1.0f, -1.0f},
-        {-1.0f, -1.0f,  1.0f},
-        { 1.0f, -1.0f, -1.0f},
-        { 1.0f, -1.0f, -1.0f},
-        {-1.0f, -1.0f,  1.0f},
-        { 1.0f, -1.0f,  1.0}
-    };
-
-    static constexpr vec2 UV_COORDS[] = {
-        {0.0f, 0.0f},
-        {1.0f, 0.0f},
-        {1.0f, 1.0f},
-        {1.0f, 1.0f},
-        {0.0f, 1.0f},
-        {0.0f, 0.0f},
-
-        {0.0f, 0.0f},
-        {1.0f, 0.0f},
-        {1.0f, 1.0f},
-        {1.0f, 1.0f},
-        {0.0f, 1.0f},
-        {0.0f, 0.0f},
-
-        {1.0f, 0.0f},
-        {1.0f, 1.0f},
-        {0.0f, 1.0f},
-        {0.0f, 1.0f},
-        {0.0f, 0.0f},
-        {1.0f, 0.0f},
-
-        {1.0f, 0.0f},
-        {1.0f, 1.0f},
-        {0.0f, 1.0f},
-        {0.0f, 1.0f},
-        {0.0f, 0.0f},
-        {1.0f, 0.0f},
-
-        {0.0f, 1.0f},
-        {1.0f, 1.0f},
-        {1.0f, 0.0f},
-        {1.0f, 0.0f},
-        {0.0f, 0.0f},
-        {0.0f, 1.0f},
-
-        {0.0f, 1.0f},
-        {1.0f, 1.0f},
-        {1.0f, 0.0f},
-        {1.0f, 0.0f},
-        {0.0f, 0.0f},
-        {0.0f, 1.0f}
-    };
-
-    static constexpr vec3 NORMALS[] = {
-            {0.0f,  0.0f, -1.0f},
-            {0.0f,  0.0f, -1.0f},
-            {0.0f,  0.0f, -1.0f},
-            {0.0f,  0.0f, -1.0f},
-            {0.0f,  0.0f, -1.0f},
-            {0.0f,  0.0f, -1.0f},
-
-            {0.0f,  0.0f,  1.0f},
-            {0.0f,  0.0f,  1.0f},
-            {0.0f,  0.0f,  1.0f},
-            {0.0f,  0.0f,  1.0f},
-            {0.0f,  0.0f,  1.0f},
-            {0.0f,  0.0f,  1.0f},
-
-            {-1.0f,  0.0f,  0.0f},
-            {-1.0f,  0.0f,  0.0f},
-            {-1.0f,  0.0f,  0.0f},
-            {-1.0f,  0.0f,  0.0f},
-            {-1.0f,  0.0f,  0.0f},
-            {-1.0f,  0.0f,  0.0f},
-
-            {1.0f,  0.0f,  0.0f},
-            {1.0f,  0.0f,  0.0f},
-            {1.0f,  0.0f,  0.0f},
-            {1.0f,  0.0f,  0.0f},
-            {1.0f,  0.0f,  0.0f},
-            {1.0f,  0.0f,  0.0f},
-
-            {0.0f, -1.0f,  0.0f},
-            {0.0f, -1.0f,  0.0f},
-            {0.0f, -1.0f,  0.0f},
-            {0.0f, -1.0f,  0.0f},
-            {0.0f, -1.0f,  0.0f},
-            {0.0f, -1.0f,  0.0f},
-
-            {0.0f,  1.0f,  0.0f},
-            {0.0f,  1.0f,  0.0f},
-            {0.0f,  1.0f,  0.0f},
-            {0.0f,  1.0f,  0.0f},
-            {0.0f,  1.0f,  0.0f},
-            {0.0f,  1.0f,  0.0f}
-    };
-};
-
-
 struct Transform
 {
     vec3  position;
     vec3  rotation;
     float scale;
 };
-struct Mesh
-{
-    GLuint id;
-    size_t count;
-};
 struct Renderable
 {
      vec3  color;
      Mesh* mesh;
+};
+struct HitBox
+{
+    float min_x, max_x;
+    float min_y, max_y;
+    float min_z, max_z;
+};
+struct Physics
+{
+    float  gravity;
+    HitBox hitbox;
+    bool   is_static;
 };
 struct Input { GLFWwindow* window; };
 struct InputBuffer
@@ -253,190 +115,44 @@ mat4 ViewMatrix(const vec3 position, const vec3 forward)
     return view;
 }
 
-#include <limits>
-#include <cstddef>
-Mesh CreateMesh(const std::vector<Vertex_>& vertices)
+
+//// Does not support roll. Expects radians.
+//void Rotate(Camera& camera, vec2 rotation)
+//{
+//    camera.yaw   = std::fmod(camera.yaw + rotation.x, 2 * M_PI);
+//    camera.pitch = glm::clamp(camera.pitch + rotation.y, -M_PI_2 + 0.001f, M_PI_2 - 0.001f);
+//
+//    camera.forward.x =  sin(camera.yaw) * cos(camera.pitch);
+//    camera.forward.z = -cos(camera.yaw) * cos(camera.pitch);  // Invert as we treat (0, 0, -1) as forward.
+//    camera.forward.y =  sin(camera.pitch);
+//
+//    camera.forward = glm::normalize(camera.forward);
+//    camera.right   = glm::normalize(glm::cross(WORLD_AXIS_UP,  -camera.forward));
+//    camera.up      = glm::normalize(glm::cross(-camera.forward, camera.right));
+//}
+
+
+bool Intersect(const vec3& pos_a, const HitBox& hitbox_a, const vec3& pos_b, const HitBox& hitbox_b)
 {
-    // Create vertex array buffer to store vertex buffers and element buffers.
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
+    bool a = hitbox_a.min_x + pos_a.x <= hitbox_b.max_x + pos_b.x;
+    bool b = hitbox_a.max_x + pos_a.x >= hitbox_b.min_x + pos_b.x;
 
-    // Create vertex buffer to put our data into video memory.
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex_), vertices.data(), GL_STATIC_DRAW);
+    bool c = hitbox_a.min_y + pos_a.y <= hitbox_b.max_y + pos_b.y;
+    bool d = hitbox_a.max_y + pos_a.y >= hitbox_b.min_y + pos_b.y;
 
-    // Tell OpenGL the data's format.
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_), (void *) offsetof(Vertex_, position));
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex_), (void *) offsetof(Vertex_, uv_coord));
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex_), (void *) offsetof(Vertex_, normal));
+    bool e = hitbox_a.min_z + pos_a.z <= hitbox_b.max_z + pos_b.z;
+    bool f = hitbox_a.max_z + pos_a.z >= hitbox_b.min_z + pos_b.z;
 
-    return { vao, vertices.size() };
+    return a && b && c && d && e && f;
 }
 
 
-Mesh CreateMesh(const vec3* positions, const vec2* uv_coords, const vec3* normals, size_t vertex_count)
+void Update(entt::registry& registry)
 {
-    size_t position_size = vertex_count * sizeof(*positions);
-    size_t texture_size  = vertex_count * sizeof(*uv_coords);
-    size_t normal_size   = vertex_count * sizeof(*normals);
-    size_t total_size    = position_size + texture_size + normal_size;
-
-    // Create vertex array buffer to store vertex buffers and element buffers.
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-
-    // Create vertex buffer to put our data into video memory.
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-    // Allocate a buffer and then insert data.
-    glBufferData(GL_ARRAY_BUFFER, total_size, nullptr, GL_STATIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, position_size, positions);
-    glBufferSubData(GL_ARRAY_BUFFER, position_size, texture_size,  uv_coords);
-    glBufferSubData(GL_ARRAY_BUFFER, position_size + texture_size, normal_size, normals);
-
-    // Tell OpenGL the data's format.
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(*positions), (void *) nullptr);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(*uv_coords), (void *) position_size);
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(*normals),   (void *) (position_size + texture_size));
-
-    return { vao, vertex_count };
-}
-
-
-
-Mesh CreateMesh(const std::vector<float>& positions, const std::vector<float>& texture_coordinates, const std::vector<float>& normals, const std::vector<GLuint>& indices)
-{
-    // TODO(ted): Maybe use some of these tips https://www.khronos.org/opengl/wiki/Vertex_Specification_Best_Practices.
-
-    size_t position_size = positions.size();
-    size_t texture_size  = texture_coordinates.size();
-    size_t normal_size   = normals.size();
-    size_t total_size    = position_size + texture_size + normal_size;
-
-    // Create vertex array buffer to store vertex buffers and element buffers.
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-
-    // Create an element buffer to put our data into video memory.
-    GLuint ebo;
-    glGenBuffers(1, &ebo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(GLuint), indices.data(), GL_STATIC_DRAW);
-
-    // Create vertex buffer to put our data into video memory.
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-    // Allocate a buffer and then insert data.
-    glBufferData(GL_ARRAY_BUFFER, total_size, nullptr, GL_STATIC_DRAW);
-    glBufferSubData(GL_ARRAY_BUFFER, 0, position_size, positions.data());
-    glBufferSubData(GL_ARRAY_BUFFER, position_size, texture_size,  texture_coordinates.data());
-    glBufferSubData(GL_ARRAY_BUFFER, position_size + texture_size, normal_size, normals.data());
-
-    // Tell OpenGL the data's format.
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) nullptr);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *) position_size);
-    glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *) (position_size + texture_size));
-
-    return { vao, indices.size() };
-}
-
-
-
-struct Event
-{
-    int id;
-};
-
-static InputBuffer buffer1;
-static InputBuffer buffer2;
-static const InputBuffer* read_buffer  = &buffer1;
-static       InputBuffer* write_buffer = &buffer2;
-
-void KeyCallback(GLFWwindow* id, int key, int scancode, int action, int mods)
-{
-    Window* window = (Window*) glfwGetWindowUserPointer(id);
-
-    bool down = action != GLFW_RELEASE;
-
-    InputBuffer* input = write_buffer;
-
-    if (key == GLFW_KEY_A)          input->left      = down;
-    if (key == GLFW_KEY_D)          input->right     = down;
-    if (key == GLFW_KEY_W)          input->forward   = down;
-    if (key == GLFW_KEY_S)          input->backward  = down;
-    if (key == GLFW_KEY_SPACE)      input->up        = down;
-    if (key == GLFW_KEY_LEFT_SHIFT) input->down      = down;
-    if (key == GLFW_KEY_Q)          input->rot_left  = down;
-    if (key == GLFW_KEY_E)          input->rot_right = down;
-
-
-    // TODO(ted): Make atomic!
-    auto* temp = const_cast<InputBuffer*>(read_buffer);
-    read_buffer  = write_buffer;
-    write_buffer = temp;
-}
-
-
-
-class Clock
-{
-public:
-    double fps;
-    int    frames;
-
-    Clock() : fps(0), frames(1), last_time(glfwGetTime()) {}
-
-    double tick()
-    {
-        double delta = now() - last_time;
-
-        if (delta > 1.0f)
-        {
-            fps = delta / double(frames);
-            frames = 0;
-            last_time = now();
-        }
-        ++frames;  // Important! Frames must always be greater than 0.
-
-        return delta;
-    }
-
-    static double now()
-    {
-        return glfwGetTime();
-    }
-
-private:
-    double last_time;
-};
-
-
-
-void UpdateVelocity(entt::registry& registry, double delta)
-{
-    auto dt = float(delta);  // TODO(ted): Seems buggy...
+    // auto dt = float(delta);  // TODO(ted): Seems buggy...
 
     registry.view<Transform, Velocity, const Input>().each(
-        [dt](auto& transform, auto& velocity, auto& input)
+        [](auto& transform, auto& velocity, auto& input)
         {
             float speed     = 0.05f;
             float rot_speed = 0.05f;
@@ -471,14 +187,45 @@ void UpdateVelocity(entt::registry& registry, double delta)
         }
     );
 
+    registry.view<Velocity, const Physics>().each(
+        [](auto& velocity, const auto& physics)
+        {
+            velocity.data.y -= physics.gravity;
+        }
+    );
+
     registry.view<Transform, const Velocity>().each(
-        [dt](auto& transform, const auto& velocity)
+        [](auto& transform, const auto& velocity)
         {
             transform.position += velocity.data;
             transform.rotation += velocity.rot;
         }
     );
+
+    registry.view<const Transform, Physics, Velocity>().each(
+        [&registry](const auto entity_a, const auto& transform_a, auto& physics_a, auto& velocity_a)
+        {
+            if (physics_a.is_static)
+                return;
+
+            for (auto [entity_b, transform_b, physics_b] : registry.view<const Transform, const Physics>().each())
+            {
+                if (entity_a == entity_b)
+                    continue;
+
+                if (Intersect(transform_a.position, physics_a.hitbox, transform_b.position, physics_b.hitbox))
+                {
+                    if (physics_b.is_static)
+                    {
+                        physics_a.gravity = 0;
+                        velocity_a.data   = vec3(0);
+                    }
+                }
+            }
+        }
+    );
 }
+
 
 std::tuple<mat4, mat4> UpdateCamera(entt::registry& registry, entt::entity camera)
 {
@@ -520,88 +267,48 @@ void Render(entt::registry& registry, const Shader& shader, entt::entity camera)
 }
 
 
-Mesh LoadAsset(const std::string& inputfile)
-{
-    tinyobj::ObjReaderConfig reader_config;
-    tinyobj::ObjReader reader;
-    Assert(reader.ParseFromFile(inputfile, reader_config), "");
-
-    auto& attrib = reader.GetAttrib();
-    auto& shapes = reader.GetShapes();
-    auto& materials = reader.GetMaterials();
-
-    std::vector<Vertex_> vertices;
-    for (size_t s = 0; s < shapes.size(); s++) {
-        // Loop over faces(polygon)
-        size_t index_offset = 0;
-        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-            int fv = shapes[s].mesh.num_face_vertices[f];
-
-            // Loop over vertices in the face.
-            for (size_t v = 0; v < fv; v++) {
-                // access to vertex
-                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-                tinyobj::real_t vx = attrib.vertices[3*idx.vertex_index+0];
-                tinyobj::real_t vy = attrib.vertices[3*idx.vertex_index+1];
-                tinyobj::real_t vz = attrib.vertices[3*idx.vertex_index+2];
-                tinyobj::real_t nx = attrib.normals[3*idx.normal_index+0];
-                tinyobj::real_t ny = attrib.normals[3*idx.normal_index+1];
-                tinyobj::real_t nz = attrib.normals[3*idx.normal_index+2];
-                tinyobj::real_t tx = attrib.texcoords[2*idx.texcoord_index+0];
-                tinyobj::real_t ty = attrib.texcoords[2*idx.texcoord_index+1];
-                vertices.push_back({
-                       {vx, vy, vz}, {tx, ty}, {nx, ny, nz}
-               });
-            }
-            index_offset += fv;
-
-            // per-face material
-            shapes[s].mesh.material_ids[f];
-        }
-    }
-
-    auto mesh = CreateMesh(vertices);
-    return mesh;
-}
-
 
 int main()
 {
     entt::registry registry;
-    Window window = CreateWindow(2880, 1710, &registry, KeyCallback);
+    Window window = CreateWindow(2880, 1710, &registry);
     glfwSetWindowUserPointer(window.id, &window);
 
-    auto wreath = LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/wreath.obj");
-    auto post   = LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/lightpost.obj");
-    auto tree   = LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/treeDecorated.obj");
+    auto wreath = CreateMesh(LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/wreath.obj"));
+    auto post   = CreateMesh(LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/lightpost.obj"));
+    auto tree   = CreateMesh(LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/treeDecorated.obj"));
     auto meshes = std::array{ wreath, post, tree };
 
     auto shader = CreateShader("Basic", LoadFileToString("../resources/shaders/basic.vs.glsl").get(), LoadFileToString("../resources/shaders/basic.fs.glsl").get());
-//    auto mesh   = CreateMesh(Cube::VERTICES, Cube::UV_COORDS, Cube::NORMALS, 36);
 
     float x = -1.0f;
     auto colors = std::array{ RED, GREEN, BLUE };
     for (int i = 0; i < 3; ++i)
     {
         const auto entity = registry.create();
-        registry.emplace<Transform>(entity, vec3{x,0,0}, vec3{0,0,0}, 0.3f);
+        registry.emplace<Transform>(entity, vec3{x,2.0f,0}, vec3{0,0,0}, 0.3f);
         registry.emplace<Renderable>(entity, colors[i], &meshes[i]);
+        registry.emplace<Velocity>(entity, vec3{0, 0, 0}, vec3{0, 0, 0});
+        registry.emplace<Physics>(entity, 0.005f, HitBox{-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0}, false);
         x += 1.0f;
     }
 
+
+    const auto floor = registry.create();
+    registry.emplace<Transform>(floor, vec3{0,0,0}, vec3{0,0,0}, 0.3f);
+    registry.emplace<Physics>(floor, 0.0f, HitBox{-10.0f, 10.0f, -10.0f, 0.0f, -10.0f, 10.0}, true);
+
+
     const auto camera = registry.create();
-    registry.emplace<Transform>(camera, vec3{0, 1, 3}, vec3(0.0f, 0.0f, -1.0f), 1.0f);
-    registry.emplace<Velocity>(camera, vec3{0, 0, 0});
+    registry.emplace<Transform>(camera, vec3{0, 0, 3}, vec3(0.0f, 0.0f, -1.0f), 1.0f);
+    registry.emplace<Velocity>(camera, vec3{0, 0, 0}, vec3{0, 0, 0});
     registry.emplace<Input>(camera, window.id);
     registry.emplace<Camera>(camera);
 
 
-    Clock clock;
     while (!glfwWindowShouldClose(window.id))
     {
-        double delta = clock.tick();
-
-        UpdateVelocity(registry, delta);
+        Update(registry);
         Render(registry, shader, camera);
 
         glfwSwapBuffers(window.id);

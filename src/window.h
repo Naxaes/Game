@@ -18,24 +18,4 @@ struct Window
     GLFWwindow* id = nullptr;  // Should never be released.
     entt::registry* registry;
 };
-Window CreateWindow(int width, int height, entt::registry* registry, GLFWkeyfun key_callback);
-
-extern double PRESS_TIME_OUT_IN_SECONDS;
-
-template <int action, int key>
-bool Pressed(GLFWwindow* window)
-{
-    static double last = glfwGetTime();
-    double time = glfwGetTime();
-
-    if (glfwGetKey(window, key) == action && time - last > PRESS_TIME_OUT_IN_SECONDS)
-    {
-        last = time;
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
+Window CreateWindow(int width, int height, entt::registry* registry);

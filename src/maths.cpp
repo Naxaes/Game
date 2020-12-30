@@ -1,11 +1,6 @@
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+#include "maths.h"
 
-using glm::vec2;
-using glm::vec3;
-
-
-vec3 RotationToHeading(const vec3& rotation)
-{
-
-}
+//vec3 RotationToHeading(const vec3& rotation)
+//{
+//
+//}

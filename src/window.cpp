@@ -13,7 +13,7 @@ void FrameBufferSizeCallback(GLFWwindow* id, int width, int height)
 
 
 
-Window CreateWindow(int width, int height, entt::registry* registry, GLFWkeyfun key_callback)
+Window CreateWindow(int width, int height, entt::registry* registry)
 {
     Window window { nullptr, registry };
 
@@ -38,7 +38,7 @@ Window CreateWindow(int width, int height, entt::registry* registry, GLFWkeyfun 
     Assert(gladLoadGLLoader((GLADloadproc) glfwGetProcAddress), "Failed to initialize GLAD");
 
     glfwSetFramebufferSizeCallback(window.id, FrameBufferSizeCallback);
-    glfwSetKeyCallback(window.id, key_callback);
+//    glfwSetKeyCallback(window.id, key_callback);
 //    glfwSetCursorPosCallback(window.id, MouseCallback);
 //    glfwSetScrollCallback(window.id, ScrollCallback);
 
