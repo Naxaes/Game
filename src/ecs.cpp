@@ -2,9 +2,25 @@
 #include <bitset>
 #include <utility>
 
+
+std::size_t GenerateID()
+{
+    static std::size_t i = 0;
+    return i++;
+}
+
+template <typename ... T>
+std::size_t GetID()
+{
+    static std::size_t i = GenerateID();
+    return i;
+}
+
+
 template <typename ... T>
 struct Entity
 {
+    std::size_t group_id;
     std::size_t id;
 };
 
@@ -16,17 +32,18 @@ class View
     {
         using Self = Iterator;
 
-        std::size_t i;
         std::tuple<Components*...> data;
+        std::size_t i;
+        std::size_t group;
 
     public:
-        Iterator(std::size_t i, std::tuple<Components*...> data) noexcept
-                : i(i), data(std::move(data)) {}
+        Iterator(std::tuple<Components*...> data, std::size_t i, std::size_t group) noexcept
+                : data{std::move(data)}, i{i}, group{group} {}
 
         auto operator* ()
         {
             return std::make_tuple(
-                Entity<Components...>{i}, std::get<Components*>(this->data)[i]...
+                Entity<Components...>{group, i}, std::get<Components*>(this->data)[i]...
             );
         }
 
@@ -51,20 +68,21 @@ class View
 
     std::tuple<Components*...> data;
     std::size_t count;
+    std::size_t group;
 
 public:
     using iterator_type = Iterator;
 
-    explicit View(std::tuple<Components*...> data, std::size_t count)
-        : data{std::move(data)}, count{count} {}
+    explicit View(std::tuple<Components*...> data, std::size_t count, std::size_t group)
+        : data{std::move(data)}, count{count}, group{group} {}
 
     iterator_type begin()
     {
-        return Iterator{ 0, data };
+        return Iterator{ data, 0, group };
     }
     iterator_type end()
     {
-        return Iterator{ count, data };
+        return Iterator{ data, count, group };
     }
 };
 
@@ -81,12 +99,13 @@ class Pool
 
     std::bitset<N> killed;
     std::size_t _count;
+    std::size_t id;
     std::tuple<Components*...> data;
     bool dirty;
 
 
 public:
-    Pool() : next(nullptr), killed({}), dirty(false), _count(0), data({})
+    Pool() : next(nullptr), killed({}), dirty(false), _count(0), id{GetID<Components...>()}, data({})
     {
         ((std::get<Components*>(this->data) = new Components[N]), ...);
     }
@@ -94,7 +113,7 @@ public:
     [[nodiscard]] inline View<T...> get() const noexcept
     {
         auto components = std::make_tuple(std::get<T*>(this->data)...);
-        return View{components, this->_count};
+        return View{components, this->_count, this->id};
     }
     template <typename T>
     [[nodiscard]] inline T& get(std::size_t i) const noexcept
@@ -161,20 +180,34 @@ struct Tag      { };
 
 
 
-//void System()
-//{
-//    for (std::size_t i = 0; i < pool1.count(); ++i)
-//    {
-//        auto position = pool1.get<Position>(i);
-//        auto velocity = pool1.get<Velocity>(i);
-//        auto scale    = pool1.get<Scale>(i);
-//
-//        printf("\nEntity:   %lu\n", i);
-//        printf("Position: %f, %f, %f\n", position.a, position.b, position.c);
-//        printf("Velocity: %f, %f, %f\n", velocity.a, velocity.b, velocity.c);
-//        printf("Scale:    %f, %f, %f\n", scale.a, scale.b, scale.c);
-//    }
-//}
+void System1(View<Position, Velocity, Scale> view)
+{
+    for (const auto& [entity, position, velocity, scale] : view)
+    {
+        printf("\nEntity:   %lu, %lu\n", entity.group_id, entity.id);
+        printf("Position: %f, %f, %f\n", position.a, position.b, position.c);
+        printf("Velocity: %f, %f, %f\n", velocity.a, velocity.b, velocity.c);
+        printf("Scale:    %f, %f, %f\n", scale.a, scale.b, scale.c);
+    }
+}
+void System2(View<Position, Velocity> view)
+{
+    for (const auto& [entity, position, velocity] : view)
+    {
+        printf("\nEntity:   %lu, %lu\n", entity.group_id, entity.id);
+        printf("Position: %f, %f, %f\n", position.a, position.b, position.c);
+        printf("Velocity: %f, %f, %f\n", velocity.a, velocity.b, velocity.c);
+    }
+}
+
+void System3(View<Position> view)
+{
+    for (const auto& [entity, position] : view)
+    {
+        printf("\nEntity:   %lu, %lu\n", entity.group_id, entity.id);
+        printf("Position: %f, %f, %f\n", position.a, position.b, position.c);
+    }
+}
 
 int main()
 {
@@ -186,32 +219,61 @@ int main()
     using F = Pool<1024, Position, Velocity>;
 
     A pool1;
-    for (int i = 0; i < 1024; ++i)
+    B pool2;
+    C pool3;
+    D pool4;
+    E pool5;
+    F pool6;
+    for (int i = 0; i < 30; ++i)
     {
-        pool1.create(
-            {1.1f*float(i),1.2f*float(i),1.3f*float(i)},
-            {1.4f*float(i),1.5f*float(i),1.6f*float(i)},
-            {1.7f*float(i),1.8f*float(i),1.9f*float(i)}
-        );
+        if (i < 5)
+            pool1.create(
+                {1.1f*float(i),1.2f*float(i),1.3f*float(i)},
+                {1.4f*float(i),1.5f*float(i),1.6f*float(i)},
+                {1.7f*float(i),1.8f*float(i),1.9f*float(i)}
+            );
+        else if (i < 10)
+            pool2.create(
+                {1.1f*float(i),1.2f*float(i),1.3f*float(i)},
+                {1.4f*float(i),1.5f*float(i),1.6f*float(i)},
+                {1.7f*float(i),1.8f*float(i),1.9f*float(i)},
+                {i, i+1},
+                {}
+            );
+        else if (i < 15)
+            pool3.create(
+                {1.1f*float(i),1.2f*float(i),1.3f*float(i)},
+                {}
+            );
+        else if (i < 20)
+            pool4.create(
+                {1.1f*float(i),1.2f*float(i),1.3f*float(i)},
+                {i, i+1}
+            );
+        else if (i < 25)
+            pool5.create(
+                {1.1f*float(i),1.2f*float(i),1.3f*float(i)},
+                {1.7f*float(i),1.8f*float(i),1.9f*float(i)},
+                {i, i+1}
+            );
+        else
+            pool6.create(
+                {1.1f*float(i),1.2f*float(i),1.3f*float(i)},
+                {1.4f*float(i),1.5f*float(i),1.6f*float(i)}
+            );
     }
 
-//    for (std::size_t i = 0; i < pool1.count(); ++i)
-//    {
-//        auto position = pool1.get<Position>(i);
-//        auto velocity = pool1.get<Velocity>(i);
-//        auto scale    = pool1.get<Scale>(i);
-//
-//        printf("\nEntity:   %lu\n", i);
-//        printf("Position: %f, %f, %f\n", position.a, position.b, position.c);
-//        printf("Velocity: %f, %f, %f\n", velocity.a, velocity.b, velocity.c);
-//        printf("Scale:    %f, %f, %f\n", scale.a, scale.b, scale.c);
-//    }
+    System1(pool1.get<Position, Velocity, Scale>());
+    System1(pool2.get<Position, Velocity, Scale>());
 
-    for (const auto& [entity, position, velocity, scale] : pool1.get<Position, Velocity, Scale>())
-    {
-        printf("\nEntity:   %lu\n", entity.id);
-        printf("Position: %f, %f, %f\n", position.a, position.b, position.c);
-        printf("Velocity: %f, %f, %f\n", velocity.a, velocity.b, velocity.c);
-        printf("Scale:    %f, %f, %f\n", scale.a, scale.b, scale.c);
-    }
+    System2(pool1.get<Position, Velocity>());
+    System2(pool2.get<Position, Velocity>());
+    System2(pool6.get<Position, Velocity>());
+
+    System3(pool1.get<Position>());
+    System3(pool2.get<Position>());
+    System3(pool3.get<Position>());
+    System3(pool4.get<Position>());
+    System3(pool5.get<Position>());
+    System3(pool6.get<Position>());
 }
