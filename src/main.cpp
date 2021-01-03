@@ -35,8 +35,9 @@ struct Transform
 };
 struct Renderable
 {
-     vec3  color;
-     Mesh* mesh;
+     vec3     color;
+     Mesh*    mesh;
+     Texture* texture;
 };
 struct HitBox
 {
@@ -271,7 +272,7 @@ void Render(entt::registry& registry, const Shader& shader, entt::entity camera)
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(shader.id);
-    for(auto [entity, transform, renderable]: registry.view<const Transform, const Renderable>().each())
+    for (auto [entity, transform, renderable]: registry.view<const Transform, const Renderable>().each())
     {
         glBindVertexArray(renderable.mesh->id);
         auto model = glm::mat4();
@@ -281,6 +282,7 @@ void Render(entt::registry& registry, const Shader& shader, entt::entity camera)
         model = glm::rotate(model, glm::radians(transform.rotation.z), vec3(0.0f, 0.0f, 1.0f));
         model = glm::scale(model, vec3(transform.scale, transform.scale, transform.scale));
 
+        SetTexture2D(shader, "diffuse", 0, renderable.mesh->texture);
         SetUniform(shader, "model", model);
         SetUniform(shader, "view", view);
         SetUniform(shader, "projection", projection);
@@ -291,52 +293,7 @@ void Render(entt::registry& registry, const Shader& shader, entt::entity camera)
 }
 
 
-// newmtl name
-//    defines the name of the material.
-// Ka r g b
-//    defines the ambient color of the material to be (r,g,b). The default is (0.2,0.2,0.2);
-// Kd r g b
-//     defines the diffuse color of the material to be (r,g,b). The default is (0.8,0.8,0.8);
-// Ks r g b
-//     defines the specular color of the material to be (r,g,b). This color shows up in highlights. The default is (1.0,1.0,1.0);
-// d alpha
-//     defines the non-transparency of the material to be alpha. The default is 1.0 (not transparent at all). The quantities d and Tr are the opposites of each other, and specifying transparency or nontransparency is simply a matter of user convenience.
-// Tr alpha
-//     defines the transparency of the material to be alpha. The default is 0.0 (not transparent at all). The quantities d and Tr are the opposites of each other, and specifying transparency or nontransparency is simply a matter of user convenience.
-// Ns s
-//     defines the shininess of the material to be s. The default is 0.0;
-// illum n
-//     denotes the illumination model used by the material. illum = 1 indicates a flat material with no specular highlights, so the value of Ks is not used. illum = 2 denotes the presence of specular highlights, and so a specification for Ks is required.
-// map_Ka filename
-//    names a file containing a texture map, which should just be an ASCII dump of RGB values;
-struct Material
-{
-    enum class Illumination
-    {
-        NO_SPECULAR = 1, HAS_SPECULAR
-    };
-
-    std::string name;   // newmtl
-    std::string file;   // map_Ka
-
-    vec3 ambient;       // Ka
-    vec3 diffuse;       // Kd
-    vec3 specular;      // Ks
-
-    float shininess;     // NS
-    float transparency;  // Tr
-    float opaqueness;    // d
-
-    Illumination illumination;  // illum
-};
-
-struct SoftwareMesh
-{
-    std::vector<Vertex>     vertices;
-    std::optional<Material> material;
-};
-
-
+static const unsigned char EMPTY_DATA[3] = {0, 0, 0};
 
 int main()
 {
@@ -344,30 +301,46 @@ int main()
     Window window = CreateWindow(2880, 1710);
     glfwSetWindowUserPointer(window.id, &registry);
 
-    auto wreath = CreateMesh(LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/wreath.obj"));
-    auto post   = CreateMesh(LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/lightpost.obj"));
-    auto tree   = CreateMesh(LoadAsset("../resources/models/kenney_holidaykit_2/Models/OBJ format/treeDecorated.obj"));
-    auto hall   = CreateMesh(LoadAsset("../resources/models/Great Hall/Great Hall Model.obj"));
-    auto meshes = std::array{ wreath, post, tree, hall };
+    Image image { 1, 1, 3, EMPTY_DATA, "Empty", "" };
+    const auto EMPTY_TEXTURE = CreateTexture2D(image);
+
+    auto scene = LoadScene("../resources/models/simple_scene.obj", "../resources/models/");
+    std::vector<Mesh> meshes;
+    for (const auto& data : scene)
+    {
+        auto mesh = CreateMesh(data.vertices);
+        if (data.material)
+        {
+            if (data.material.value().image_data)
+                mesh.texture = CreateTexture2D(data.material.value().image_data.value());
+            else
+                mesh.texture = EMPTY_TEXTURE;   // TODO(ted): Colored material.
+        }
+        else
+        {
+            mesh.texture = EMPTY_TEXTURE;
+        }
+
+        meshes.push_back(mesh);
+    }
 
     auto shader = CreateShader("Basic", LoadFileToString("../resources/shaders/basic.vs.glsl").get(), LoadFileToString("../resources/shaders/basic.fs.glsl").get());
 
     float x = -1.0f;
+    int   i = 0;
     auto colors = std::array{ RED, GREEN, BLUE };
-    for (int i = 0; i < 3; ++i)
+    for (std::size_t i = 0; i < meshes.size(); ++i)
     {
+        auto& mesh = meshes[i];
+        auto& data = scene[i];
+
         const auto entity = registry.create();
-        registry.emplace<Transform>(entity, vec3{x,2.0f,0}, vec3{0,0,0}, 0.3f);
-        registry.emplace<Renderable>(entity, colors[i], &meshes[i]);
+        registry.emplace<Transform>(entity, vec3{x*data.mesh_id,2.0f,0}, vec3{0,0,0}, 0.3f);
+        registry.emplace<Renderable>(entity, colors[data.material_id % 3], &mesh);
         registry.emplace<Velocity>(entity, vec3{0, 0, 0}, vec3{0, 0, 0});
         registry.emplace<Physics>(entity, 0.005f, HitBox{-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0}, false);
         x += 1.0f;
     }
-
-
-    const auto entity = registry.create();
-    registry.emplace<Transform>(entity, vec3{0,0,0}, vec3{0,0,0}, 0.3f);
-    registry.emplace<Renderable>(entity, MAGENTA, &hall);
 
 
     const auto floor = registry.create();

@@ -5,12 +5,14 @@
 #include <glad/glad.h>
 
 #include "maths.h"
+#include "texture.h"
 
 
 struct Mesh
 {
-    GLuint id;
-    size_t count;
+    GLuint  id      = 0;
+    size_t  count   = 0;
+    Texture texture = {};
 };
 
 

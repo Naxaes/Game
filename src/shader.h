@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 
 #include "debug.h"
+#include "texture.h"
 
 
 using glm::vec2;
@@ -102,7 +103,7 @@ void SetUniform(const Shader& shader, const char* name, const vec3& value);
 void SetUniform(const Shader& shader, const char* name, const vec4& value);
 void SetUniform(const Shader& shader, const char* name, const mat4& value);
 void SetUniformArray(const Shader& shader, const char* name, const mat4* value, int count);
-//void SetTexture2D(const Shader& shader, const char* name, GLint index, const Texture& texture);
+void SetTexture2D(const Shader& shader, const char* name, GLint index, const Texture& texture);
 //void SetTexture3D(const Shader& shader, const char* name, GLint index, const Texture& texture);
 void BindUniformBuffer(Shader& shader, const char* name, GLuint binding);
 

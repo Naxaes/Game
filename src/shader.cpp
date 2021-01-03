@@ -76,19 +76,19 @@ void SetUniformArray(const Shader& shader, const char* name, const mat4* value, 
     GLuint location = GetUniformLocation(shader, name);
     glUniformMatrix4fv(location, count, GL_FALSE, (const GLfloat *) value);
 }
-//void SetTexture2D(const Shader& shader, const char* name, GLint index, const Texture& texture)
-//{
-//    ASSERT_BOUND_SHADER(shader);
-//    ASSERT(texture.dimension == 2, "Texture '%s' has wrong dimension (%d).", texture.name.c_str(), texture.dimension);
-//
-//    // NOTE(ted): We MUST bind a texture for all samplers before drawing.
-////    ASSERT(shader.samplers.size() > index, "Index %i specify a greater number than the amount of samplers (%i) for program '%s'.", index, shader.samplers.size(), shader.name);
-//
-//    GLuint location = GetUniformLocation(shader, name);
-//    glActiveTexture(GL_TEXTURE0 + index);
-//    glBindTexture(GL_TEXTURE_2D, texture.id);
-//    glUniform1i(location, index);
-//}
+void SetTexture2D(const Shader& shader, const char* name, GLint index, const Texture& texture)
+{
+    ASSERT_BOUND_SHADER(shader);
+    ASSERT(texture.dimension == 2, "Texture '%s' has wrong dimension (%d).", texture.name.c_str(), texture.dimension);
+
+    // NOTE(ted): We MUST bind a texture for all samplers before drawing.
+//    ASSERT(shader.samplers.size() > index, "Index %i specify a greater number than the amount of samplers (%i) for program '%s'.", index, shader.samplers.size(), shader.name);
+
+    GLuint location = GetUniformLocation(shader, name);
+    glActiveTexture(GL_TEXTURE0 + index);
+    glBindTexture(GL_TEXTURE_2D, texture.id);
+    glUniform1i(location, index);
+}
 //void SetTexture3D(const Shader& shader, const char* name, GLint index, const Texture& texture)
 //{
 //    ASSERT_BOUND_SHADER(shader);
@@ -284,52 +284,6 @@ Shader CreateShader(const char* name, const char* vertex_source, const char* fra
     return shader;
 }
 
-
-void DeleteShader(Shader* shader)
-{
-    glDeleteProgram(shader->id);
-//    for (size_t i = 0; i < loaded_shaders.size(); ++i)
-//    {
-//        if (&loaded_shaders[i] == shader)
-//        {
-//            loaded_shaders.erase(loaded_shaders.begin() + i);
-//            break;
-//        }
-//    }
-}
-
-ShaderMap LoadShaders(const std::vector<InParam>& program_parameters)
-{
-    ShaderMap programs;  // TODO(ted): Pre-allocate.
-    for (const auto& info : program_parameters)
-    {
-        const char* program_name = info.name;
-        const std::unique_ptr<char> vertex_source   = LoadFileToString(info.vertex);
-        const std::unique_ptr<char> fragment_source = LoadFileToString(info.fragment);
-        const std::unique_ptr<char> geometry_source = info.geometry ? LoadFileToString(info.geometry) : nullptr;
-
-        programs[program_name] = CreateShader(program_name, vertex_source.get(), fragment_source.get(), geometry_source.get());
-    }
-
-    return programs;
-}
-
-ShaderMap LoadPostProcessingShaders(const char* base, const std::vector<InParamPost>& program_parameters)
-{
-    ShaderMap programs;  // TODO(ted): Pre-allocate.
-    {
-        const std::unique_ptr<char> post_processing_vertex_source = LoadFileToString(base);
-        for (const auto& info : program_parameters)
-        {
-            const char* program_name    = info.name;
-            const std::unique_ptr<char> fragment_source = LoadFileToString(info.fragment);
-
-            programs[program_name] = CreateShader(program_name, post_processing_vertex_source.get(), fragment_source.get());
-        }
-    }
-
-    return programs;
-}
 
 
 const char* TypeToString(GLenum type)
