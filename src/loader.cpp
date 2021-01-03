@@ -6,11 +6,18 @@
 #include "debug.h"
 
 
-std::vector<Vertex> LoadAsset(const std::string& input_file)
+std::vector<Vertex> LoadAsset(const std::string& input_file, const std::string& material_directory)
 {
     tinyobj::ObjReaderConfig reader_config;
+    reader_config.mtl_search_path = material_directory; // "./"; // Path to material files
+
     tinyobj::ObjReader reader;
-    Assert(reader.ParseFromFile(input_file, reader_config), "");
+
+    if (!reader.ParseFromFile(input_file, reader_config))
+        ASSERT(!reader.Error().empty(), reader.Error().data());
+
+    if (!reader.Warning().empty())
+        WARNING(reader.Warning().data());
 
     auto& attrib = reader.GetAttrib();
     auto& shapes = reader.GetShapes();

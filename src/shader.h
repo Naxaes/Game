@@ -111,7 +111,7 @@ template <typename T> struct UBO { GLuint id; };
 template <typename T>
 UBO<T> CreateUniformBuffer(GLuint binding, const T* data = nullptr)
 {
-    Assert(sizeof(T) % 4 == 0, "Type must be padded to a multiple of 4");
+    ASSERT(sizeof(T) % 4 == 0, "Type must be padded to a multiple of 4");
 
     GLuint ubo;
     glGenBuffers(1, &ubo);
@@ -128,7 +128,7 @@ UBO<T> CreateUniformBuffer(GLuint binding, const T* data = nullptr)
 template <typename T>
 void SetUniformBuffer(UBO<T> ubo, const T& data, GLuint from_byte = 0, GLuint size = sizeof(T))
 {
-    Assert(sizeof(T) % 4 == 0, "Type must be padded to a multiple of 4");
+    ASSERT(sizeof(T) % 4 == 0, "Type must be padded to a multiple of 4");
 
     glBindBuffer(GL_UNIFORM_BUFFER, ubo.id);
     glBufferSubData(GL_UNIFORM_BUFFER, from_byte, size, &data);

@@ -29,13 +29,13 @@ Window CreateWindow(int width, int height)
 
 
     window.id = glfwCreateWindow(width, height, "LearnOpenGL", nullptr, nullptr);
-    Assert(window.id != nullptr, "Failed to create GLFW window");
+    ASSERT(window.id != nullptr, "Failed to create GLFW window");
 
     // 'width' and 'height' will be set in 'FrameBufferSizeCallback' as some displays (like Retina displays) use more
     // 4 pixels for every pixel.
     glfwMakeContextCurrent(window.id);
 
-    Assert(gladLoadGLLoader((GLADloadproc) glfwGetProcAddress), "Failed to initialize GLAD");
+    ASSERT(gladLoadGLLoader((GLADloadproc) glfwGetProcAddress), "Failed to initialize GLAD");
 
     glfwSetFramebufferSizeCallback(window.id, FrameBufferSizeCallback);
 //    glfwSetKeyCallback(window.id, key_callback);
@@ -50,7 +50,7 @@ Window CreateWindow(int width, int height)
     glfwGetFramebufferSize(window.id, &resolution_width, &resolution_height);
     FrameBufferSizeCallback(window.id, resolution_width, resolution_height);
 
-    Info("Successfully created 'GLFWwindow'");
+    INFO("Successfully created 'GLFWwindow'");
 
     return window;
 }

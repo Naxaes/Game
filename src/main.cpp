@@ -291,11 +291,49 @@ void Render(entt::registry& registry, const Shader& shader, entt::entity camera)
 }
 
 
-
-
-class Scene
+// newmtl name
+//    defines the name of the material.
+// Ka r g b
+//    defines the ambient color of the material to be (r,g,b). The default is (0.2,0.2,0.2);
+// Kd r g b
+//     defines the diffuse color of the material to be (r,g,b). The default is (0.8,0.8,0.8);
+// Ks r g b
+//     defines the specular color of the material to be (r,g,b). This color shows up in highlights. The default is (1.0,1.0,1.0);
+// d alpha
+//     defines the non-transparency of the material to be alpha. The default is 1.0 (not transparent at all). The quantities d and Tr are the opposites of each other, and specifying transparency or nontransparency is simply a matter of user convenience.
+// Tr alpha
+//     defines the transparency of the material to be alpha. The default is 0.0 (not transparent at all). The quantities d and Tr are the opposites of each other, and specifying transparency or nontransparency is simply a matter of user convenience.
+// Ns s
+//     defines the shininess of the material to be s. The default is 0.0;
+// illum n
+//     denotes the illumination model used by the material. illum = 1 indicates a flat material with no specular highlights, so the value of Ks is not used. illum = 2 denotes the presence of specular highlights, and so a specification for Ks is required.
+// map_Ka filename
+//    names a file containing a texture map, which should just be an ASCII dump of RGB values;
+struct Material
 {
+    enum class Illumination
+    {
+        NO_SPECULAR = 1, HAS_SPECULAR
+    };
 
+    std::string name;   // newmtl
+    std::string file;   // map_Ka
+
+    vec3 ambient;       // Ka
+    vec3 diffuse;       // Kd
+    vec3 specular;      // Ks
+
+    float shininess;     // NS
+    float transparency;  // Tr
+    float opaqueness;    // d
+
+    Illumination illumination;  // illum
+};
+
+struct SoftwareMesh
+{
+    std::vector<Vertex>     vertices;
+    std::optional<Material> material;
 };
 
 

@@ -11,7 +11,7 @@ std::unique_ptr<char> LoadFileToString(const char* path)
 
     if (!file_stream.is_open())
     {
-        Warning("Couldn't open file '%s'.\n", path);
+        WARNING("Couldn't open file '%s'.\n", path);
         return nullptr;
     }
 

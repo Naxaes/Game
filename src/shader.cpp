@@ -7,7 +7,7 @@
 
 
 #ifdef DEBUG
-#define ASSERT_BOUND_SHADER(shader) do {GLint id; glGetIntegerv(GL_CURRENT_PROGRAM, &id); Assert(id == shader.id, "Shader '%s' is not bound.", shader.name.get()); } while(0)
+#define ASSERT_BOUND_SHADER(shader) do {GLint id; glGetIntegerv(GL_CURRENT_PROGRAM, &id); ASSERT(id == shader.id, "Shader '%s' is not bound.", shader.name.get()); } while(0)
 #else
 #define ASSERT_BOUND_SHADER(shader)
 #endif
@@ -19,7 +19,7 @@ GLuint GetUniformLocation(const Shader& shader, const char* name)
     const auto& it = shader.uniforms.find(name);
     if (it == shader.uniforms.end())
     {
-        Info("Uniform '%s' doesn't exist for shader '%s'", name, shader.name.get());
+        INFO("Uniform '%s' doesn't exist for shader '%s'", name, shader.name.get());
         return 0;
     }
     else
@@ -79,10 +79,10 @@ void SetUniformArray(const Shader& shader, const char* name, const mat4* value, 
 //void SetTexture2D(const Shader& shader, const char* name, GLint index, const Texture& texture)
 //{
 //    ASSERT_BOUND_SHADER(shader);
-//    Assert(texture.dimension == 2, "Texture '%s' has wrong dimension (%d).", texture.name.c_str(), texture.dimension);
+//    ASSERT(texture.dimension == 2, "Texture '%s' has wrong dimension (%d).", texture.name.c_str(), texture.dimension);
 //
 //    // NOTE(ted): We MUST bind a texture for all samplers before drawing.
-////    Assert(shader.samplers.size() > index, "Index %i specify a greater number than the amount of samplers (%i) for program '%s'.", index, shader.samplers.size(), shader.name);
+////    ASSERT(shader.samplers.size() > index, "Index %i specify a greater number than the amount of samplers (%i) for program '%s'.", index, shader.samplers.size(), shader.name);
 //
 //    GLuint location = GetUniformLocation(shader, name);
 //    glActiveTexture(GL_TEXTURE0 + index);
@@ -92,10 +92,10 @@ void SetUniformArray(const Shader& shader, const char* name, const mat4* value, 
 //void SetTexture3D(const Shader& shader, const char* name, GLint index, const Texture& texture)
 //{
 //    ASSERT_BOUND_SHADER(shader);
-//    Assert(texture.dimension == 3, "Texture '%s' has wrong dimension (%d).", texture.name.c_str(), texture.dimension);
+//    ASSERT(texture.dimension == 3, "Texture '%s' has wrong dimension (%d).", texture.name.c_str(), texture.dimension);
 //
 //    // NOTE(ted): We MUST bind a texture for all samplers before drawing.
-////    Assert(shader.samplers.size() > index, "Index %i specify a greater number than the amount of samplers (%i) for program '%s'.", index, shader.samplers.size(), shader.name);
+////    ASSERT(shader.samplers.size() > index, "Index %i specify a greater number than the amount of samplers (%i) for program '%s'.", index, shader.samplers.size(), shader.name);
 //
 //    GLuint location = GetUniformLocation(shader, name);
 //    glActiveTexture(GL_TEXTURE0 + index);
@@ -106,7 +106,7 @@ void SetUniformArray(const Shader& shader, const char* name, const mat4* value, 
 void BindUniformBuffer(Shader& shader, const char* name, GLuint binding)
 {
     GLint index = glGetUniformBlockIndex(shader.id, name);
-    Assert(index != -1, "Invalid uniform block for shader %s!", shader.name.get());
+    ASSERT(index != -1, "Invalid uniform block for shader %s!", shader.name.get());
     glUniformBlockBinding(shader.id, index, binding);
 
 
@@ -120,10 +120,10 @@ void BindUniformBuffer(Shader& shader, const char* name, GLuint binding)
 
 Shader CreateShader(const char* name, const char* vertex_source, const char* fragment_source, const char* geometry_source)
 {
-    Assert(*vertex_source != 0,   "Vertex source cannot be empty");
-    Assert(*fragment_source != 0, "Fragment source cannot be empty");
+    ASSERT(*vertex_source != 0,   "Vertex source cannot be empty");
+    ASSERT(*fragment_source != 0, "Fragment source cannot be empty");
     if (geometry_source)
-        Assert(*geometry_source != 0, "Geometry source cannot be empty");
+        ASSERT(*geometry_source != 0, "Geometry source cannot be empty");
 
     constexpr int log_size = 512;
 
@@ -166,19 +166,19 @@ Shader CreateShader(const char* name, const char* vertex_source, const char* fra
     if (!program)
     {
         glGetShaderInfoLog(vertex, log_size, nullptr, info_log);
-        Warning("Invalid shader program for program '%s'.\n%s", name, info_log);
+        WARNING("Invalid shader program for program '%s'.\n%s", name, info_log);
     }
     glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
     if (!success)
     {
         glGetShaderInfoLog(vertex, log_size, nullptr, info_log);
-        Warning("Vertex shader compilation failed for program '%s'.\n%s", name, info_log);
+        WARNING("Vertex shader compilation failed for program '%s'.\n%s", name, info_log);
     }
     glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
     if (!success)
     {
         glGetShaderInfoLog(fragment, log_size, nullptr, info_log);
-        Warning("Fragment shader compilation failed for program '%s'.\n%s", name, info_log);
+        WARNING("Fragment shader compilation failed for program '%s'.\n%s", name, info_log);
     }
     if (geometry)
     {
@@ -186,14 +186,14 @@ Shader CreateShader(const char* name, const char* vertex_source, const char* fra
         if (!success)
         {
             glGetShaderInfoLog(fragment, log_size, nullptr, info_log);
-            Warning("Fragment shader compilation failed for program '%s'.\n%s", name, info_log);
+            WARNING("Fragment shader compilation failed for program '%s'.\n%s", name, info_log);
         }
     }
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success)
     {
         glGetProgramInfoLog(program, log_size, nullptr, info_log);
-        Warning("Shader program linking failed for program '%s'.\n%s", name, info_log);
+        WARNING("Shader program linking failed for program '%s'.\n%s", name, info_log);
     }
 
 

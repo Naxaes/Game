@@ -2,11 +2,11 @@
 
 #define DEBUG
 
-#define Assert(statement, ...) do { if (!(statement)) LogImplementation(LogLevel::ASSERTION, #statement, __FILE__, __LINE__, __VA_ARGS__); } while(false)
+#define ASSERT(statement, ...) do { if (!(statement)) LogImplementation(LogLevel::ASSERTION, #statement, __FILE__, __LINE__, __VA_ARGS__); } while(false)
 
-#define Info(...)    LogImplementation(LogLevel::INFO,    #__VA_ARGS__, __FILE__, __LINE__, __VA_ARGS__)
-#define Error(...)   LogImplementation(LogLevel::ERROR,   #__VA_ARGS__, __FILE__, __LINE__, __VA_ARGS__)
-#define Warning(...) LogImplementation(LogLevel::WARNING, #__VA_ARGS__, __FILE__, __LINE__, __VA_ARGS__)
+#define INFO(...)    LogImplementation(LogLevel::INFO,    #__VA_ARGS__, __FILE__, __LINE__, __VA_ARGS__)
+#define WARNING(...) LogImplementation(LogLevel::WARNING, #__VA_ARGS__, __FILE__, __LINE__, __VA_ARGS__)
+#define ERROR(...)   LogImplementation(LogLevel::ERROR,   #__VA_ARGS__, __FILE__, __LINE__, __VA_ARGS__)
 
 #ifdef DEBUG
 #define DEBUG_BLOCK(x) { x }
