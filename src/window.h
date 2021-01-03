@@ -16,6 +16,5 @@ void ScrollCallback(GLFWwindow* window, double x_offset, double y_offset);
 struct Window
 {
     GLFWwindow* id = nullptr;  // Should never be released.
-    entt::registry* registry;
 };
-Window CreateWindow(int width, int height, entt::registry* registry);
+Window CreateWindow(int width, int height);

@@ -1,0 +1,2 @@
+Template tuple tricks:
+https://devblogs.microsoft.com/oldnewthing/20200629-00/?p=103910

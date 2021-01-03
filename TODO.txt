@@ -7,8 +7,9 @@ Voxel-based game.
 * Get a running window.
 * Add ECS.
 * Showcase a 3D-cube.
+* Create a movable FPS-camera.
 
 
 ---- TODO ----
-* Create a movable FPS-camera.
-
+* Fix camera rotation.
+* Fix hitbox collision.

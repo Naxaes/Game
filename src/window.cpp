@@ -13,9 +13,9 @@ void FrameBufferSizeCallback(GLFWwindow* id, int width, int height)
 
 
 
-Window CreateWindow(int width, int height, entt::registry* registry)
+Window CreateWindow(int width, int height)
 {
-    Window window { nullptr, registry };
+    Window window { nullptr };
 
     glfwInit();
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
