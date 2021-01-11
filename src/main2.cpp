@@ -3,6 +3,10 @@
 #include <fstream>
 #include <unordered_map>
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_RESIZE_IMPLEMENTATION
+#include <stb_image.h>
+#include <stb_image_resize.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -796,6 +800,51 @@ private:
 };
 
 
+
+
+class Image
+{
+public:
+    static constexpr unsigned char EMPTY_DATA[3] = {0, 0, 0};
+
+    int width     = 0;
+    int height    = 0;
+    int channels  = 0;
+    const std::uint8_t* data = nullptr;
+
+    std::string name      = "";
+    std::string directory = "";
+
+    static const Image from_raw(int width, int height, int channels, const unsigned char* data, const std::string& name, const std::string& directory);
+
+    static const Image empty()
+    {
+        int width     = 1;
+        int height    = 1;
+        int channels  = 3;
+        const unsigned char* data = EMPTY_DATA;
+
+        std::string name      = "empty";
+        std::string directory = "";
+
+        return { width, height, channels, data, name, directory };
+    }
+
+    // TODO(ted): @LEAK We don't free this.
+    static const Image from_path(const std::string& name, const std::string& directory)
+    {
+        int width, height, channels;
+        auto* data = stbi_load((directory + name).data(), &width, &height, &channels, 0);
+        if (!data)
+            WARNING("Couldn't load %s%s.", directory.data(), name.data());
+
+        return { width, height, channels, data, name, directory };
+    }
+};
+
+
+
+
 class Texture2D
 {
 public:
@@ -830,6 +879,41 @@ public:
         glTexImage2D(target, 0, internal_format, width, height, 0, data_format, data_type, data);
 
         return { id, width, height, target, data_type, data_format };
+    }
+
+
+    static Texture2D Create(const Image& image)
+    {
+        std::uint32_t id;
+
+        GLenum target = GL_TEXTURE_2D;
+        GLenum data_type = GL_UNSIGNED_BYTE;
+        GLenum internal_format = GL_RGBA;
+
+        GLenum data_format;
+        if (image.channels == 4)
+            data_format = GL_RGBA;
+        if (image.channels == 3)
+            data_format = GL_RGB;
+        else
+            ERROR("Don't support image with %i channels.", image.channels);
+
+        glGenTextures(1, &id);
+        glBindTexture(target, id);
+
+//        glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+//        glTexParameteri(target, GL_TEXTURE_MAX_LEVEL,  1000);  // 1000 is the default.
+//        glTexParameterf(target, GL_TEXTURE_LOD_BIAS,   0.0f);
+
+        glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+        glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+        glTexImage2D(target, 0, internal_format, image.width, image.height, 0, data_format, data_type, image.data);
+
+        return { id, std::uint32_t(image.width), std::uint32_t(image.height), target, data_type, data_format };
     }
 
     static void Destroy(Texture2D* texture)
@@ -881,6 +965,8 @@ public:
         float texture_index;
     };
     using Index = std::uint32_t;
+
+    enum Color { Default = 0, Red, Green, Blue };
 
     Renderer(VertexArray vertex_array, VertexBuffer vertex_buffer,
              Shader shader, Index* quad_index, Vertex* quad_vertex, Texture2D* textures, std::size_t texture_count)
@@ -951,11 +1037,11 @@ public:
         const std::uint8_t blue[] = {0, 0, 255, 255};
         auto texture2 = Texture2D::Create(1, 1, blue);
 
-        textures[0] = default_texture;
-        textures[1] = texture0;
-        textures[2] = texture1;
-        textures[3] = texture2;
-        std::size_t texture_count = 4;
+        textures[Color::Default] = default_texture;
+        textures[Color::Red]     = texture0;
+        textures[Color::Green]   = texture1;
+        textures[Color::Blue]    = texture2;
+        std::size_t texture_count  = 4;
 
         return {vertex_array, vertex_buffer, color_shader, quad_indices, quad_vertices, textures, texture_count };
     }
@@ -965,6 +1051,22 @@ public:
         this->view_matrix = camera.ViewMatrix();
         this->proj_matrix = camera.ProjectionMatrix();
         this->quad_count  = 0;
+    }
+    void DrawQuad(vec3 position, float scale, const Image& image)
+    {
+        auto it = this->images.find(image.name);
+        if (it == this->images.end())
+        {
+            auto texture = Texture2D::Create(image);
+            this->textures[this->texture_count] = texture;
+            this->images[image.name] = this->texture_count;
+            this->DrawQuad(position, scale, this->texture_count);
+            ++this->texture_count;
+        }
+        else
+        {
+            this->DrawQuad(position, scale, it->second);
+        }
     }
     void DrawQuad(vec3 position, float scale, int texture)
     {
@@ -1039,27 +1141,35 @@ private:
 
     mat4 view_matrix {};
     mat4 proj_matrix {};
+
+    std::unordered_map<std::string, std::uint32_t> images;
 };
 
 
 
 int main()
 {
-    auto window   = Window::Create(2880, 1710, "Game");
-    auto renderer = Renderer::Create();
+    stbi_set_flip_vertically_on_load(true);
+
+    auto window      = Window::Create(2880, 1710, "Game");
+    auto renderer_2d = Renderer::Create();
 
     Camera camera;
     glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
+    auto image1 = Image::from_path("wallpaper-purple.jpg", "../resources/models/");
+    auto image2 = Image::from_path("DarkRainbowBackground.jpg", "../resources/models/");
+
     while (window.Continue())
     {
         glClear(GL_COLOR_BUFFER_BIT);
-        renderer.BeginScene(camera);
-        renderer.DrawQuad(vec3{ -0.5f,  0.5f, 0.0f }, 0.1f, 0);
-        renderer.DrawQuad(vec3{  0.5f,  0.5f, 0.0f }, 0.1f, 1);
-        renderer.DrawQuad(vec3{ -0.5f, -0.5f, 0.0f }, 0.1f, 2);
-        renderer.DrawQuad(vec3{  0.5f, -0.5f, 0.0f }, 0.1f, 3);
-        renderer.Flush();
+
+        renderer_2d.BeginScene(camera);
+        renderer_2d.DrawQuad(vec3{ -0.5f,  0.5f, 0.0f }, 0.1f, image1);
+        renderer_2d.DrawQuad(vec3{  0.5f,  0.5f, 0.0f }, 0.1f, image2);
+        renderer_2d.DrawQuad(vec3{ -0.5f, -0.5f, 0.0f }, 0.1f, Renderer::Color::Blue);
+        renderer_2d.DrawQuad(vec3{  0.5f, -0.5f, 0.0f }, 0.1f, Renderer::Color::Green);
+        renderer_2d.EndScene();
 
         window.Update();
     }
