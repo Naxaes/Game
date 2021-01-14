@@ -2,11 +2,14 @@
 #include <string>
 #include <fstream>
 #include <unordered_map>
+#include <optional>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include <stb_image.h>
 #include <stb_image_resize.h>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -211,7 +214,7 @@ public:
         mat4 view = glm::lookAt(this->position, this->position + this->forward, WORLD_AXIS_UP);
         return view;
     }
-private:
+//private:
     vec3 position = vec3(0);
 
     vec3 forward  = WORLD_AXIS_FORWARD;
@@ -607,6 +610,15 @@ public:
     void SetData(const void* data, std::uint32_t size)
     {
         glBindBuffer(GL_ARRAY_BUFFER, this->id);
+        {
+            GLint buffer_size = -1;
+            glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &buffer_size);
+            if (buffer_size <= size)
+            {
+                WARNING("Buffer of size %d can't fit data of size %d.", buffer_size, size);
+                return;
+            }
+        }
         glBufferSubData(GL_ARRAY_BUFFER, 0, size, data);
     }
     void SetData(const void* data, std::uint32_t from, std::uint32_t to)
@@ -644,7 +656,7 @@ public:
 
         return { id, 0 };
     }
-    static IndexBuffer Create(const void* indices, std::size_t size)
+    static IndexBuffer Create(const std::uint32_t* indices, std::size_t size)
     {
         std::uint32_t id;
         glGenBuffers(1, &id);
@@ -672,7 +684,11 @@ public:
     {
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     }
-
+    void SetData(const std::uint32_t* data, std::uint32_t size)
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, this->id);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, size, data);
+    }
     std::uint32_t GetCount() const
     {
         return this->count;
@@ -893,7 +909,7 @@ public:
         GLenum data_format;
         if (image.channels == 4)
             data_format = GL_RGBA;
-        if (image.channels == 3)
+        else if (image.channels == 3)
             data_format = GL_RGB;
         else
             ERROR("Don't support image with %i channels.", image.channels);
@@ -954,7 +970,173 @@ public:
 };
 
 
-class Renderer
+struct Vertex
+{
+    glm::vec3 position;
+    glm::vec2 uv_coord;
+    glm::vec3 normal;
+    float texture_index;
+};
+
+// newmtl name
+//    defines the name of the material.
+// Ka r g b
+//    defines the ambient color of the material to be (r,g,b). The default is (0.2,0.2,0.2);
+// Kd r g b
+//     defines the diffuse color of the material to be (r,g,b). The default is (0.8,0.8,0.8);
+// Ks r g b
+//     defines the specular color of the material to be (r,g,b). This color shows up in highlights. The default is (1.0,1.0,1.0);
+// d alpha
+//     defines the non-transparency of the material to be alpha. The default is 1.0 (not transparent at all). The quantities d and Tr are the opposites of each other, and specifying transparency or nontransparency is simply a matter of user convenience.
+// Tr alpha
+//     defines the transparency of the material to be alpha. The default is 0.0 (not transparent at all). The quantities d and Tr are the opposites of each other, and specifying transparency or nontransparency is simply a matter of user convenience.
+// Ns s
+//     defines the shininess of the material to be s. The default is 0.0;
+// illum n
+//     denotes the illumination model used by the material. illum = 1 indicates a flat material with no specular highlights, so the value of Ks is not used. illum = 2 denotes the presence of specular highlights, and so a specification for Ks is required.
+// map_Ka filename
+//    names a file containing a texture map, which should just be an ASCII dump of RGB values;
+struct SoftwareMaterial
+{
+    enum Illumination
+    {
+        NO_SPECULAR = 1, HAS_SPECULAR
+    };
+
+    std::string name = "default";      // newmtl
+
+    vec3 ambient  = {0.2, 0.2, 0.2};   // Ka
+    vec3 diffuse  = {0.8, 0.8, 0.8};   // Kd
+    vec3 specular = {1.0, 1.0, 1.0};   // Ks
+
+    float shininess     = 0.0;         // NS
+    float transparency  = 0.0;         // Tr
+    float opaqueness    = 1.0;         // d
+
+    Illumination illumination = NO_SPECULAR;  // illum
+
+    std::optional<Image> ambient_map  = {};  // map_Ka
+    std::optional<Image> diffuse_map  = {};  // map_Kd
+    std::optional<Image> specular_map = {};  // map_Ks
+    std::optional<Image> bump_map     = {};  // map_bump
+
+    std::optional<Image> opaque_map   = {};  // map_d
+};
+
+struct SoftwareMesh
+{
+    std::size_t          mesh_id     = 0;
+    std::size_t          material_id = 0;
+    std::string          name        = "";
+    std::vector<Vertex>  vertices    = {};
+    SoftwareMaterial*    material    = nullptr;
+};
+
+
+// Stolen from SO. Should be temporary.
+struct pair_hash
+{
+    template <class T1, class T2>
+    std::size_t operator () (const std::pair<T1, T2> &p) const
+    {
+        auto h1 = std::hash<T1>{}(p.first);
+        auto h2 = std::hash<T2>{}(p.second);
+
+        // Mainly for demonstration purposes, i.e. works but is overly simple
+        // In the real world, use sth. like boost.hash_combine
+        return h1 ^ h2;
+    }
+};
+
+// TODO(ted): Stupidly slow and probably buggy.
+std::pair<std::vector<SoftwareMesh>, std::vector<SoftwareMaterial>>
+LoadScene(const std::string& input_file, const std::string& material_directory)
+{
+    tinyobj::ObjReaderConfig reader_config;
+    reader_config.mtl_search_path = material_directory;
+
+    tinyobj::ObjReader reader;
+
+    if (!reader.ParseFromFile(input_file, reader_config))
+        ASSERT(!reader.Error().empty(), reader.Error().data());
+
+    if (!reader.Warning().empty())
+        WARNING(reader.Warning().data());
+
+    auto& attrib = reader.GetAttrib();
+    auto& shapes = reader.GetShapes();
+    auto& materials = reader.GetMaterials();
+
+
+    std::vector<SoftwareMaterial> all_materials;
+    all_materials.reserve(materials.size());
+    for (const auto& material : materials)
+        all_materials.emplace_back(SoftwareMaterial {
+                std::move(material.name),
+                { material.ambient[0],  material.ambient[1],  material.ambient[2]  },
+                { material.diffuse[0],  material.diffuse[1],  material.diffuse[2]  },
+                { material.specular[0], material.specular[1], material.specular[2] },
+                material.shininess, 0.0, 1.0,
+                (material.illum == 1) ? SoftwareMaterial::NO_SPECULAR : SoftwareMaterial::HAS_SPECULAR,
+                (material.ambient_texname.size()  > 0) ? std::move(Image::from_path(material.ambient_texname,  material_directory)) : std::optional<Image>(),
+                (material.diffuse_texname.size()  > 0) ? std::move(Image::from_path(material.diffuse_texname,  material_directory)) : std::optional<Image>(),
+                (material.specular_texname.size() > 0) ? std::move(Image::from_path(material.specular_texname, material_directory)) : std::optional<Image>(),
+                (material.bump_texname.size()     > 0) ? std::move(Image::from_path(material.bump_texname,     material_directory)) : std::optional<Image>(),
+                (material.alpha_texname.size()    > 0) ? std::move(Image::from_path(material.alpha_texname,    material_directory)) : std::optional<Image>()
+        });
+
+
+
+    std::unordered_map<std::pair<std::size_t, std::size_t>, SoftwareMesh, pair_hash> meshes;
+    for (size_t s = 0; s < shapes.size(); s++)
+    {
+        std::vector<Vertex> vertices;
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++)
+        {
+            auto m  = shapes[s].mesh.material_ids[f];  // per-face material
+            auto i  = std::pair(std::size_t(s), std::size_t(m));
+            auto it = meshes.find(i);
+            if (it == meshes.end())
+            {
+                meshes[i] = std::move(SoftwareMesh {
+                        i.first, i.second, shapes[s].name, {}, &all_materials[m]
+                });
+            };
+
+            auto& mesh = meshes[i];
+
+            int fv = shapes[s].mesh.num_face_vertices[f];
+            for (size_t v = 0; v < fv; v++)
+            {
+                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+                tinyobj::real_t vx = attrib.vertices[3*idx.vertex_index+0];
+                tinyobj::real_t vy = attrib.vertices[3*idx.vertex_index+1];
+                tinyobj::real_t vz = attrib.vertices[3*idx.vertex_index+2];
+                tinyobj::real_t nx = attrib.normals[3*idx.normal_index+0];
+                tinyobj::real_t ny = attrib.normals[3*idx.normal_index+1];
+                tinyobj::real_t nz = attrib.normals[3*idx.normal_index+2];
+                tinyobj::real_t tx = attrib.texcoords[2*idx.texcoord_index+0];
+                tinyobj::real_t ty = attrib.texcoords[2*idx.texcoord_index+1];
+                mesh.vertices.push_back({
+                                                {vx, vy, vz}, {tx, ty}, {nx, ny, nz}
+                                        });
+            }
+            index_offset += fv;
+        }
+    }
+
+    std::vector<SoftwareMesh> all_meshes;
+    all_meshes.reserve(meshes.size());
+
+    for(auto it : meshes)
+        all_meshes.push_back(it.second);
+
+    return { all_meshes, all_materials };
+}
+
+
+class Renderer2D
 {
 public:
     struct Vertex
@@ -968,7 +1150,7 @@ public:
 
     enum Color { Default = 0, Red, Green, Blue };
 
-    Renderer(VertexArray vertex_array, VertexBuffer vertex_buffer,
+    Renderer2D(VertexArray vertex_array, VertexBuffer vertex_buffer,
              Shader shader, Index* quad_index, Vertex* quad_vertex, Texture2D* textures, std::size_t texture_count)
             : vertex_array{vertex_array},
               vertex_buffer{vertex_buffer},
@@ -985,7 +1167,7 @@ public:
     static constexpr std::size_t MAX_INDICES  = MAX_QUADS * 6;
     static constexpr std::size_t MAX_TEXTURES = 16; // TODO: RenderCaps
 
-    static Renderer Create()
+    static Renderer2D Create()
     {
         ASSERT(context_created, "No.");
 
@@ -1147,29 +1329,187 @@ private:
 
 
 
+class Renderer3D
+{
+public:
+    struct Vertex
+    {
+        glm::vec3 position;
+        glm::vec2 uv_coord;
+        glm::vec3 normal;
+    };
+    using Index = std::uint32_t;
+
+    Renderer3D(Shader shader) : shader{shader} {}
+
+    static constexpr std::size_t MAX_VERTICES = 32768;
+    static constexpr std::size_t MAX_INDICES  = 1024 * 6;
+    static constexpr std::size_t MAX_TEXTURES = 16; // TODO: RenderCaps
+
+    static Renderer3D Create()
+    {
+        ASSERT(context_created, "No.");
+
+        auto mesh_shader = Shader::Create("mesh_shader",
+            ReadFile("../resources/shaders/basic.vs.glsl").data(),
+            ReadFile("../resources/shaders/basic.fs.glsl").data()
+        );
+
+        return { mesh_shader };
+    }
+
+    void BeginScene(const Camera& camera)
+    {
+        this->view_matrix = camera.ViewMatrix();
+        this->proj_matrix = camera.ProjectionMatrix();
+    }
+    void DrawMeshes(const std::vector<SoftwareMesh>& meshes, const std::vector<SoftwareMaterial>& materials)
+    {
+        const auto empty_texture = Texture2D::Create(Image::empty());
+
+        for (const auto& data : meshes)
+        {
+            std::string name =
+                    (data.material && data.material->diffuse_map) ?
+                    data.material->name :
+                    "Unnamed";
+
+            Texture2D texture =
+                    (data.material && data.material->diffuse_map) ?
+                    Texture2D::Create(data.material->diffuse_map.value()) :
+                    empty_texture;   // TODO(ted): Colored material;
+
+            std::vector<Vertex> new_vertices;
+            for (const auto& mesh_vertex : data.vertices)
+            {
+                new_vertices.emplace_back(
+                    Vertex{
+                        mesh_vertex.position,
+                        mesh_vertex.uv_coord,
+                        mesh_vertex.normal
+                    }
+                );
+            }
+
+            auto vertex_buffer = VertexBuffer::Create(2 * new_vertices.size() * sizeof(Vertex));
+            vertex_buffer.SetLayout({
+                    { ShaderDataType::Float3, "position" },
+                    { ShaderDataType::Float2, "uv_coord" },
+                    { ShaderDataType::Float3, "normal" },
+            });
+            auto vertex_array = VertexArray::Create();
+            vertex_array.AddVertexBuffer(this->shader, vertex_buffer);
+
+            this->render_data.emplace(name, RenderData {
+                std::move(new_vertices),
+                std::move(texture),
+                vertex_array,
+                vertex_buffer
+            });
+        }
+    }
+    void EndScene()
+    {
+        this->Flush();
+    }
+    void Flush()
+    {
+        this->shader.Bind();
+
+        auto model = glm::mat4();
+        model = glm::translate(model, vec3(0));
+        this->shader.SetUniform("model",      model);
+        this->shader.SetUniform("view",       this->view_matrix);
+        this->shader.SetUniform("projection", this->proj_matrix);
+
+        for (auto& [name, render_data] : this->render_data)
+        {
+//            render_data.vertex_buffer.SetData(render_data.vertices.data(), render_data.vertices.size() * sizeof(Vertex));
+
+            const auto& vertices = render_data.vertices;
+
+            GLuint vao;
+            glGenVertexArrays(1, &vao);
+            glBindVertexArray(vao);
+
+            // Create vertex buffer to put our data into video memory.
+            GLuint vbo;
+            glGenBuffers(1, &vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+            glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), vertices.data(), GL_STATIC_DRAW);
+
+            // Tell OpenGL the data's format.
+            glEnableVertexAttribArray(0);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *) offsetof(Vertex, position));
+            glEnableVertexAttribArray(1);
+            glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *) offsetof(Vertex, uv_coord));
+            glEnableVertexAttribArray(2);
+            glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *) offsetof(Vertex, normal));
+
+
+            auto texture  = std::string("diffuse");
+            auto location = this->shader.GetUniforms().at(texture).index;
+            render_data.texture.Bind(0);
+            glUniform1i(location, 0);
+
+            glBindVertexArray(vao);
+            glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+        }
+    }
+
+private:
+    struct RenderData
+    {
+        std::vector<Vertex> vertices;
+        Texture2D texture;
+
+        VertexArray  vertex_array;
+        VertexBuffer vertex_buffer;
+    };
+
+
+    Shader shader;
+
+    std::vector<Vertex>    vertices {};
+    std::vector<Index>     indices  {};
+    std::vector<Texture2D> textures {};
+
+    mat4 view_matrix {};
+    mat4 proj_matrix {};
+
+    std::unordered_map<std::string, RenderData> render_data {};
+};
+
+
+
+
+
 int main()
 {
     stbi_set_flip_vertically_on_load(true);
 
     auto window      = Window::Create(2880, 1710, "Game");
-    auto renderer_2d = Renderer::Create();
+//    auto renderer_2d = Renderer2D::Create();
+    auto renderer_3d = Renderer3D::Create();
 
     Camera camera;
+    camera.position = vec3{0, 2.0f, 3.0f};
     glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
-    auto image1 = Image::from_path("wallpaper-purple.jpg", "../resources/models/");
-    auto image2 = Image::from_path("DarkRainbowBackground.jpg", "../resources/models/");
+//    auto [all_meshes, all_materials] = LoadScene("../resources/models/sponza/sponza.obj", "../resources/models/sponza/");
+    auto [all_meshes, all_materials] = LoadScene("../resources/models/cube.obj", "../resources/models/");
 
+    renderer_3d.DrawMeshes(all_meshes, all_materials);
     while (window.Continue())
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
-        renderer_2d.BeginScene(camera);
-        renderer_2d.DrawQuad(vec3{ -0.5f,  0.5f, 0.0f }, 0.1f, image1);
-        renderer_2d.DrawQuad(vec3{  0.5f,  0.5f, 0.0f }, 0.1f, image2);
-        renderer_2d.DrawQuad(vec3{ -0.5f, -0.5f, 0.0f }, 0.1f, Renderer::Color::Blue);
-        renderer_2d.DrawQuad(vec3{  0.5f, -0.5f, 0.0f }, 0.1f, Renderer::Color::Green);
-        renderer_2d.EndScene();
+        renderer_3d.BeginScene(camera);
+        renderer_3d.EndScene();
+//        renderer_2d.DrawQuad(vec3{ -0.5f,  0.5f, 0.0f }, 0.1f, image1);
+//        renderer_2d.DrawQuad(vec3{  0.5f,  0.5f, 0.0f }, 0.1f, image2);
+//        renderer_2d.DrawQuad(vec3{ -0.5f, -0.5f, 0.0f }, 0.1f, Renderer::Color::Blue);
+//        renderer_2d.DrawQuad(vec3{  0.5f, -0.5f, 0.0f }, 0.1f, Renderer::Color::Green);
 
         window.Update();
     }

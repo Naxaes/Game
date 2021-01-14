@@ -8,8 +8,27 @@
 #include <debug.h>
 
 
+static const unsigned char EMPTY_DATA[3] = {0, 0, 0};
+
+
+const Image Image::empty()
+{
+    int width     = 1;
+    int height    = 1;
+    int channels  = 3;
+    const unsigned char* data = EMPTY_DATA;
+
+    std::string name      = "empty";
+    std::string directory = "";
+
+    return { width, height, channels, data, name, directory };
+}
+
+
+
+
 // TODO(ted): @LEAK We don't free this.
-Image Image::from_path(const std::string& name, const std::string& directory)
+const Image Image::from_path(const std::string& name, const std::string& directory)
 {
     int width, height, channels;
     auto* data = stbi_load((directory + name).data(), &width, &height, &channels, 0);

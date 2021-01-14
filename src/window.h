@@ -17,4 +17,4 @@ struct Window
 {
     GLFWwindow* id = nullptr;  // Should never be released.
 };
-Window CreateWindow(int width, int height);
+Window CreateWindow(int width, int height, const char* name);

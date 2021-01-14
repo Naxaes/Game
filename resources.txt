@@ -1,2 +1,9 @@
 Template tuple tricks:
 https://devblogs.microsoft.com/oldnewthing/20200629-00/?p=103910
+
+
+http://realtimecollisiondetection.net/blog/?p=86
+
+https://www.cg.tuwien.ac.at/research/publications/2007/bauchinger-2007-mre/bauchinger-2007-mre-Thesis.pdf
+
+https://fabiensanglard.net/

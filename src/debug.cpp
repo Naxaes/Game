@@ -25,8 +25,7 @@ void LogImplementation(LogLevel level, const char* statement, const char* file, 
     {
         fprintf(
                 stdout,
-                "[Logging] (Info):\n"
-                "\tMessage: %s\n",
+                "[Logging] %s\n",
                 buffer
         );
     }

@@ -1,6 +1,6 @@
 #pragma once
 
-#define DEBUG
+#define DEBUG true
 
 #define ASSERT(statement, ...) do { if (!(statement)) LogImplementation(LogLevel::ASSERTION, #statement, __FILE__, __LINE__, __VA_ARGS__); } while(false)
 

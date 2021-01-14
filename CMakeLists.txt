@@ -29,4 +29,15 @@ target_link_libraries(Game glad glfw)
 
 
 
-add_executable(ECS src/ecs.cpp)
+set(
+    SOURCES  # EXCLUDING MAIN!
+    src/debug.cpp
+)
+add_executable(Try src/main2.cpp ${SOURCES})
+#target_include_directories(Try PRIVATE src/)
+target_include_directories(Try PRIVATE libraries/stb/)
+target_include_directories(Try PRIVATE libraries/glad/include/)
+target_include_directories(Try PRIVATE libraries/glm/)
+target_include_directories(Try PRIVATE libraries/entt/src/)
+target_include_directories(Try PRIVATE libraries/tinyobjloader/)
+target_link_libraries(Try glad glfw)

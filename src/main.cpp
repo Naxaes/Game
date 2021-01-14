@@ -74,7 +74,7 @@ struct Camera
     float speed = 4.0f;
 
     float near = 0.1f;
-    float far  = 100.0f;
+    float far  = 1000.0f;
     float fov  = 80.0f;
     float aspect_ratio   = 1.0f;
     bool is_orthographic = false;
@@ -272,53 +272,57 @@ void Render(entt::registry& registry, const Shader& shader, entt::entity camera)
     glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(shader.id);
+    auto model = glm::mat4();
+    model = glm::translate(model, vec3(0));
+//    model = glm::rotate(model, glm::radians(transform.rotation.x), vec3(1.0f, 0.0f, 0.0f));
+//    model = glm::rotate(model, glm::radians(transform.rotation.y), vec3(0.0f, 1.0f, 0.0f));
+//    model = glm::rotate(model, glm::radians(transform.rotation.z), vec3(0.0f, 0.0f, 1.0f));
+//    model = glm::scale(model, vec3(transform.scale, transform.scale, transform.scale));
+    SetUniform(shader, "model", model);
+    SetUniform(shader, "view",  view);
+    SetUniform(shader, "projection", projection);
+    GLuint bound_mesh_id = -1;
     for (auto [entity, transform, renderable]: registry.view<const Transform, const Renderable>().each())
     {
-        glBindVertexArray(renderable.mesh->id);
-        auto model = glm::mat4();
-        model = glm::translate(model, transform.position);
-        model = glm::rotate(model, glm::radians(transform.rotation.x), vec3(1.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(transform.rotation.y), vec3(0.0f, 1.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(transform.rotation.z), vec3(0.0f, 0.0f, 1.0f));
-        model = glm::scale(model, vec3(transform.scale, transform.scale, transform.scale));
-
+        if (bound_mesh_id != renderable.mesh->id)
+        {
+            glBindVertexArray(renderable.mesh->id);
+            bound_mesh_id = renderable.mesh->id;
+        }
         SetTexture2D(shader, "diffuse", 0, renderable.mesh->texture);
-        SetUniform(shader, "model", model);
-        SetUniform(shader, "view", view);
-        SetUniform(shader, "projection", projection);
-        SetUniform(shader, "object_color", renderable.color);
+//        SetUniform(shader,   "object_color", renderable.color);
         glDrawArrays(GL_TRIANGLES, 0, renderable.mesh->count);
     }
     glUseProgram(0);
 }
 
 
-static const unsigned char EMPTY_DATA[3] = {0, 0, 0};
-
 int main()
 {
     entt::registry registry;
-    Window window = CreateWindow(2880, 1710);
+    Window window = CreateWindow(2880, 1710, "Game");
     glfwSetWindowUserPointer(window.id, &registry);
 
-    Image image { 1, 1, 3, EMPTY_DATA, "Empty", "" };
-    const auto EMPTY_TEXTURE = CreateTexture2D(image);
+    const auto empty_texture = CreateTexture2D(Image::empty());
 
-    auto scene = LoadScene("../resources/models/simple_scene.obj", "../resources/models/");
+//    auto [all_meshes, all_materials] = LoadScene("../resources/models/sponza/sponza.obj", "../resources/models/sponza/");
+    auto [all_meshes, all_materials] = LoadScene("../resources/models/cube.obj", "../resources/models/");
     std::vector<Mesh> meshes;
-    for (const auto& data : scene)
+    for (const auto& data : all_meshes)
     {
         auto mesh = CreateMesh(data.vertices);
         if (data.material)
         {
-            if (data.material.value().image_data)
-                mesh.texture = CreateTexture2D(data.material.value().image_data.value());
+            auto material = data.material;
+
+            if (material->diffuse_map)
+                mesh.texture = CreateTexture2D(material->diffuse_map.value());
             else
-                mesh.texture = EMPTY_TEXTURE;   // TODO(ted): Colored material.
+                mesh.texture = empty_texture;   // TODO(ted): Colored material.
         }
         else
         {
-            mesh.texture = EMPTY_TEXTURE;
+            mesh.texture = empty_texture;
         }
 
         meshes.push_back(mesh);
@@ -332,20 +336,25 @@ int main()
     for (std::size_t i = 0; i < meshes.size(); ++i)
     {
         auto& mesh = meshes[i];
-        auto& data = scene[i];
+        auto& data = all_meshes[i];
 
         const auto entity = registry.create();
         registry.emplace<Transform>(entity, vec3{x*data.mesh_id,2.0f,0}, vec3{0,0,0}, 0.3f);
         registry.emplace<Renderable>(entity, colors[data.material_id % 3], &mesh);
-        registry.emplace<Velocity>(entity, vec3{0, 0, 0}, vec3{0, 0, 0});
-        registry.emplace<Physics>(entity, 0.005f, HitBox{-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0}, false);
+//        registry.emplace<Velocity>(entity, vec3{0, 0, 0}, vec3{0, 0, 0});
+//        registry.emplace<Physics>(entity, 0.005f, HitBox{-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0}, false);
         x += 1.0f;
     }
 
 
-    const auto floor = registry.create();
-    registry.emplace<Transform>(floor, vec3{0,0,0}, vec3{0,0,0}, 0.3f);
-    registry.emplace<Physics>(floor, 0.0f, HitBox{-10.0f, 10.0f, -10.0f, 0.0f, -10.0f, 10.0}, true);
+    registry.sort<Renderable>([](const auto& lhs, const auto& rhs) {
+        return lhs.mesh->id < rhs.mesh->id;
+    });
+
+
+//    const auto floor = registry.create();
+//    registry.emplace<Transform>(floor, vec3{0,0,0}, vec3{0,0,0}, 0.3f);
+//    registry.emplace<Physics>(floor, 0.0f, HitBox{-10.0f, 10.0f, -10.0f, 0.0f, -10.0f, 10.0}, true);
 
 
     const auto camera = registry.create();

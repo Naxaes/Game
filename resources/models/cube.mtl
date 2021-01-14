@@ -8,3 +8,6 @@ Kd 0.8 0.8 0.8
 Ks 0.8 0.8 0.8
 d 1
 illum 2
+map_Ks spnza_bricks_a_spec.png
+map_Ka spnza_bricks_a_diff.png
+map_Kd spnza_bricks_a_diff.png

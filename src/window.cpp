@@ -13,7 +13,7 @@ void FrameBufferSizeCallback(GLFWwindow* id, int width, int height)
 
 
 
-Window CreateWindow(int width, int height)
+Window CreateWindow(int width, int height, const char* name)
 {
     Window window { nullptr };
 
@@ -28,7 +28,7 @@ Window CreateWindow(int width, int height)
 #endif
 
 
-    window.id = glfwCreateWindow(width, height, "LearnOpenGL", nullptr, nullptr);
+    window.id = glfwCreateWindow(width, height, name, nullptr, nullptr);
     ASSERT(window.id != nullptr, "Failed to create GLFW window");
 
     // 'width' and 'height' will be set in 'FrameBufferSizeCallback' as some displays (like Retina displays) use more

@@ -26,7 +26,8 @@ struct pair_hash
 
 
 // TODO(ted): Stupidly slow and probably buggy.
-std::vector<SoftwareMesh> LoadScene(const std::string& input_file, const std::string& material_directory)
+std::pair<std::vector<SoftwareMesh>, std::vector<SoftwareMaterial>>
+LoadScene(const std::string& input_file, const std::string& material_directory)
 {
     tinyobj::ObjReaderConfig reader_config;
     reader_config.mtl_search_path = material_directory;
@@ -42,6 +43,26 @@ std::vector<SoftwareMesh> LoadScene(const std::string& input_file, const std::st
     auto& attrib = reader.GetAttrib();
     auto& shapes = reader.GetShapes();
     auto& materials = reader.GetMaterials();
+    
+    
+    std::vector<SoftwareMaterial> all_materials;
+    all_materials.reserve(materials.size());
+    for (const auto& material : materials)
+        all_materials.emplace_back(SoftwareMaterial {
+            std::move(material.name),
+            { material.ambient[0],  material.ambient[1],  material.ambient[2]  },
+            { material.diffuse[0],  material.diffuse[1],  material.diffuse[2]  },
+            { material.specular[0], material.specular[1], material.specular[2] },
+            material.shininess, 0.0, 1.0,
+            (material.illum == 1) ? SoftwareMaterial::NO_SPECULAR : SoftwareMaterial::HAS_SPECULAR,
+            (material.ambient_texname.size()  > 0) ? std::move(Image::from_path(material.ambient_texname,  material_directory)) : std::optional<Image>(),
+            (material.diffuse_texname.size()  > 0) ? std::move(Image::from_path(material.diffuse_texname,  material_directory)) : std::optional<Image>(),
+            (material.specular_texname.size() > 0) ? std::move(Image::from_path(material.specular_texname, material_directory)) : std::optional<Image>(),
+            (material.bump_texname.size()     > 0) ? std::move(Image::from_path(material.bump_texname,     material_directory)) : std::optional<Image>(),
+            (material.alpha_texname.size()    > 0) ? std::move(Image::from_path(material.alpha_texname,    material_directory)) : std::optional<Image>()
+        });
+    
+    
 
     std::unordered_map<std::pair<std::size_t, std::size_t>, SoftwareMesh, pair_hash> meshes;
     for (size_t s = 0; s < shapes.size(); s++)
@@ -56,19 +77,7 @@ std::vector<SoftwareMesh> LoadScene(const std::string& input_file, const std::st
             if (it == meshes.end())
             {
                 meshes[i] = std::move(SoftwareMesh {
-                    i.first, i.second, shapes[s].name, {},
-                    SofwareMaterial {
-                        materials[m].name,
-                        materials[m].diffuse_texname,
-                        { materials[m].ambient[0],  materials[m].ambient[1],  materials[m].ambient[2]  },
-                        { materials[m].diffuse[0],  materials[m].diffuse[1],  materials[m].diffuse[2]  },
-                        { materials[m].specular[0], materials[m].specular[1], materials[m].specular[2] },
-                        materials[m].shininess,
-                        0.0,
-                        1.0,
-                        (materials[m].illum == 1) ? SofwareMaterial::NO_SPECULAR : SofwareMaterial::HAS_SPECULAR,
-                        (materials[m].diffuse_texname.size() > 0) ? std::move(Image::from_path(materials[m].diffuse_texname, material_directory)) : std::optional<Image>()
-                    }
+                    i.first, i.second, shapes[s].name, {}, &all_materials[m]
                 });
             };
 
@@ -100,7 +109,7 @@ std::vector<SoftwareMesh> LoadScene(const std::string& input_file, const std::st
     for(auto it : meshes)
         all_meshes.push_back(it.second);
 
-    return all_meshes;
+    return { all_meshes, all_materials };
 }
 
 

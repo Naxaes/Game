@@ -26,15 +26,17 @@ struct TextureOptions
 class Image
 {
 public:
-    int width           = 0;
-    int height          = 0;
-    int channels        = 0;
+    int width     = 0;
+    int height    = 0;
+    int channels  = 0;
     const unsigned char* data = nullptr;
 
     std::string name      = "";
     std::string directory = "";
 
-    static Image from_path(const std::string& name, const std::string& directory);
+    static const Image from_raw(int width, int height, int channels, const unsigned char* data, const std::string& name, const std::string& directory);
+    static const Image from_path(const std::string& name, const std::string& directory);
+    static const Image empty();
 };
 
 

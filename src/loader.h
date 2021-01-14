@@ -25,7 +25,7 @@
 //     denotes the illumination model used by the material. illum = 1 indicates a flat material with no specular highlights, so the value of Ks is not used. illum = 2 denotes the presence of specular highlights, and so a specification for Ks is required.
 // map_Ka filename
 //    names a file containing a texture map, which should just be an ASCII dump of RGB values;
-struct SofwareMaterial
+struct SoftwareMaterial
 {
     enum Illumination
     {
@@ -33,7 +33,6 @@ struct SofwareMaterial
     };
 
     std::string name = "default";      // newmtl
-    std::string file = "";             // map_Ka
 
     vec3 ambient  = {0.2, 0.2, 0.2};   // Ka
     vec3 diffuse  = {0.8, 0.8, 0.8};   // Kd
@@ -45,19 +44,25 @@ struct SofwareMaterial
 
     Illumination illumination = NO_SPECULAR;  // illum
 
-    std::optional<Image> image_data;
+    std::optional<Image> ambient_map  = {};  // map_Ka
+    std::optional<Image> diffuse_map  = {};  // map_Kd
+    std::optional<Image> specular_map = {};  // map_Ks
+    std::optional<Image> bump_map     = {};  // map_bump
+
+    std::optional<Image> opaque_map   = {};  // map_d
 };
 
 struct SoftwareMesh
 {
-    std::size_t mesh_id     = 0;
-    std::size_t material_id = 0;
-    std::string                    name     = "";
-    std::vector<Vertex>            vertices = {};
-    std::optional<SofwareMaterial> material = {};
+    std::size_t          mesh_id     = 0;
+    std::size_t          material_id = 0;
+    std::string          name        = "";
+    std::vector<Vertex>  vertices    = {};
+    SoftwareMaterial*    material    = nullptr;
 };
 
 
 
 std::vector<Vertex> LoadAsset(const std::string& input_file, const std::string& material_directory = "");
-std::vector<SoftwareMesh> LoadScene(const std::string& input_file, const std::string& material_directory = "");
+std::pair<std::vector<SoftwareMesh>, std::vector<SoftwareMaterial>>
+LoadScene(const std::string& input_file, const std::string& material_directory = "");
